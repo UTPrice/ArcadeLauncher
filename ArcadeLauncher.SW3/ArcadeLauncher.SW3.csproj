@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<UseWindowsForms>true</UseWindowsForms>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<UseWPF>true</UseWPF>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<ApplicationIcon>Icon.ico</ApplicationIcon>
+	</PropertyGroup>
+	<ItemGroup>
+	  <None Remove="Icon.ico" />
+	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="Microsoft.Win32.SystemEvents" Version="9.0.4" />
+	  <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\ArcadeLauncher.Core\ArcadeLauncher.Core.csproj" />
+	  <ProjectReference Include="..\ArcadeLauncher.Plugins\ArcadeLauncher.Plugins.csproj" />
+	  <ProjectReference Include="..\ArcadeLauncher.YuzuPlugin\ArcadeLauncher.YuzuPlugin.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Resource Include="Icon.ico">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Resource>
+	</ItemGroup>
+	<ItemGroup>
+	  <None Update="default_controller.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="default_marquee.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="PerimeterShadow.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+</Project>
