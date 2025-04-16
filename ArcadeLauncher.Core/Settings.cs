@@ -21,7 +21,8 @@ namespace ArcadeLauncher.Core
                 { "Up", new List<string> { "UpArrow" } },
                 { "Down", new List<string> { "DownArrow" } },
                 { "Select", new List<string> { "Enter" } }, // Renamed from "Launch" to "Select"
-                { "Exit", new List<string> { "Escape" } }
+                { "Exit", new List<string> { "Escape" } },
+                { "Kill", new List<string>() } // New Kill Switch mapping, empty by default
             };
         }
     }

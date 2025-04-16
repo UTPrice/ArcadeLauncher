@@ -9,52 +9,152 @@ using System.Windows.Media.Imaging;
 using ArcadeLauncher.Core;
 using ArcadeLauncher.Plugins;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace ArcadeLauncher.SW3
 {
     public partial class MainWindow
     {
+        private Process? activeProcess; // Track the active game process
+        private DateTime? lastKillPressTime; // Track the time of the last Kill key press
+        private bool isGameActive; // Flag to track game state
+        private const int DoublePressThreshold = 500; // 500ms threshold for double-press
+        private IntPtr hookId = IntPtr.Zero; // Handle for the keyboard hook
+
+        // P/Invoke declarations for global keyboard hook
+        private delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
+        private const int WH_KEYBOARD_LL = 13;
+        private const int WM_KEYDOWN = 0x0100;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        private HookProc hookProc;
+
         private void InitializeGameLogic()
         {
-            // No timers needed for the minimal implementation
+            // Set up the global keyboard hook
+            hookProc = HookCallback;
+            using (var curProcess = System.Diagnostics.Process.GetCurrentProcess())
+            using (var curModule = curProcess.MainModule)
+            {
+                hookId = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, GetModuleHandle(curModule.ModuleName), 0);
+                if (hookId == IntPtr.Zero)
+                {
+                    LogToFile($"Failed to set keyboard hook. Error: {Marshal.GetLastWin32Error()}");
+                }
+                else
+                {
+                    LogToFile("Keyboard hook successfully set.");
+                }
+            }
         }
 
-        private List<IEmulatorPlugin> LoadPlugins()
+        private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            // Get the directory of the executable
-            string exePath = AppDomain.CurrentDomain.BaseDirectory;
-            // Look for Plugins in the parent directory
-            string pluginDir = Path.Combine(exePath, "..", "Plugins");
-            pluginDir = Path.GetFullPath(pluginDir); // Resolve the path to avoid issues with relative paths
-            var pluginList = new List<IEmulatorPlugin>();
-
-            if (!Directory.Exists(pluginDir))
+            if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN)
             {
-                LogToFile($"Plugins directory not found: {pluginDir}");
-                return pluginList;
-            }
+                int vkCode = Marshal.ReadInt32(lParam);
+                string keyString = KeyInterop.KeyFromVirtualKey(vkCode).ToString();
+                LogToFile($"Global hook detected key down: {keyString}");
 
-            foreach (var dll in Directory.GetFiles(pluginDir, "*.dll"))
-            {
-                try
+                if (settings != null && settings.InputMappings.ContainsKey("Kill") && settings.InputMappings["Kill"].Any())
                 {
-                    var assembly = System.Reflection.Assembly.LoadFrom(dll);
-                    var types = assembly.GetTypes().Where(t => typeof(IEmulatorPlugin).IsAssignableFrom(t) && !t.IsInterface);
-                    foreach (var type in types)
+                    if (settings.InputMappings["Kill"].Contains(keyString, StringComparer.OrdinalIgnoreCase))
                     {
-                        if (Activator.CreateInstance(type) is IEmulatorPlugin plugin)
+                        DateTime currentTime = DateTime.Now;
+                        if (lastKillPressTime.HasValue && (currentTime - lastKillPressTime.Value).TotalMilliseconds <= DoublePressThreshold)
                         {
-                            pluginList.Add(plugin);
-                            LogToFile($"Loaded plugin: {dll}");
+                            // Double-press detected
+                            Dispatcher.Invoke(() =>
+                            {
+                                LogToFile($"Global hook: Kill Switch double-press detected for key {keyString}. Active process state: {activeProcess?.HasExited ?? true}");
+                                if (isGameActive && activeProcess != null && !activeProcess.HasExited)
+                                {
+                                    try
+                                    {
+                                        LogToFile($"Attempting to terminate process: {activeProcess.StartInfo.FileName}");
+                                        activeProcess.Kill();
+                                        LogToFile($"Process terminated: {activeProcess.StartInfo.FileName}");
+                                        PerformPostExitCleanup(); // Manually trigger cleanup
+                                        isGameActive = false;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        LogToFile($"Failed to terminate process: {ex.Message}");
+                                    }
+                                }
+                                else
+                                {
+                                    LogToFile($"Global hook: No active process to terminate or process already exited.");
+                                }
+                                lastKillPressTime = null; // Reset after handling
+                            });
+                        }
+                        else
+                        {
+                            lastKillPressTime = currentTime;
+                            LogToFile($"Global hook: Kill Switch single press detected for key {keyString}. Waiting for second press within {DoublePressThreshold}ms.");
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    LogToFile($"Failed to load plugin from {dll}: {ex.Message}");
-                }
             }
-            return pluginList;
+            return CallNextHookEx(hookId, nCode, wParam, lParam);
+        }
+
+        private void PerformPostExitCleanup()
+        {
+            if (activeProcess != null)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    var game = games?.FirstOrDefault(g => g.ExecutablePath == activeProcess.StartInfo.FileName || (g.Type == "Emulated" && plugins?.FirstOrDefault(p => p.Name == g.EmulatorPlugin)?.BuildLaunchCommand(g.EmulatorPath, g.RomPath, g.CustomParameters) == activeProcess.StartInfo.Arguments));
+                    if (game != null)
+                    {
+                        // Revert Monitor #2 and #3
+                        if (marqueeWindow != null && marqueeWindow.Content is System.Windows.Controls.Image marqueeImage2)
+                        {
+                            string marqueeDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_marquee.png");
+                            SetImageSourceSafely(marqueeImage2, marqueeDefaultPath);
+                        }
+                        if (controllerWindow != null && controllerWindow.Content is System.Windows.Controls.Image controllerImage2)
+                        {
+                            string controllerDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_controller.png");
+                            SetImageSourceSafely(controllerImage2, controllerDefaultPath);
+                        }
+
+                        // Run Post-Exit Commands
+                        foreach (var cmd in game.PostExitCommands ?? new List<string>())
+                        {
+                            RunCommand(cmd, "Post-Exit Command");
+                        }
+
+                        // Tuck the cursor back to the bottom-right corner after game exit
+                        var screenWidthLogicalPostExit = SystemParameters.PrimaryScreenWidth;
+                        var screenHeightLogicalPostExit = SystemParameters.PrimaryScreenHeight;
+                        var screenWidthPhysicalPostExit = (int)(screenWidthLogicalPostExit * dpiScaleFactor);
+                        var screenHeightPhysicalPostExit = (int)(screenHeightLogicalPostExit * dpiScaleFactor);
+                        System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysicalPostExit - 1, screenHeightPhysicalPostExit - 1);
+                        LogToFile($"Restored mouse cursor after Kill Switch exit: Moved to bottom-right pixel (physical): ({screenWidthPhysicalPostExit - 1}, {screenHeightPhysicalPostExit - 1})");
+                    }
+                    else
+                    {
+                        LogToFile("Could not determine game for post-exit cleanup.");
+                    }
+                    activeProcess = null;
+                    isGameActive = false;
+                });
+            }
         }
 
         private void MoveSelection(int delta)
@@ -247,6 +347,7 @@ namespace ArcadeLauncher.SW3
                     gameProcess.StartInfo.FileName = game.ExecutablePath;
                     gameProcess.StartInfo.UseShellExecute = true; // Required for proper process handling
                     gameProcess.EnableRaisingEvents = true;
+                    isGameActive = true; // Set game active flag
                     gameProcess.Exited += (s, e) =>
                     {
                         Dispatcher.Invoke(() =>
@@ -276,9 +377,14 @@ namespace ArcadeLauncher.SW3
                             var screenHeightPhysicalPostExit = (int)(screenHeightLogicalPostExit * dpiScaleFactor);
                             System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysicalPostExit - 1, screenHeightPhysicalPostExit - 1);
                             LogToFile($"Restored mouse cursor after PC game exit: Moved to bottom-right pixel (physical): ({screenWidthPhysicalPostExit - 1}, {screenHeightPhysicalPostExit - 1})");
+
+                            // Clear the active process and state
+                            activeProcess = null;
+                            isGameActive = false;
                         });
                     };
                     gameProcess.Start();
+                    activeProcess = gameProcess; // Set the active process
                     LogToFile($"Launched PC game: {game.ExecutablePath}");
                 }
                 else if (game.Type == "Emulated")
@@ -293,6 +399,7 @@ namespace ArcadeLauncher.SW3
                         emulatorProcess.StartInfo.Arguments = $"/c {cmd}";
                         emulatorProcess.StartInfo.UseShellExecute = true;
                         emulatorProcess.EnableRaisingEvents = true;
+                        isGameActive = true; // Set game active flag
                         emulatorProcess.Exited += (s, e) =>
                         {
                             Dispatcher.Invoke(() =>
@@ -323,9 +430,14 @@ namespace ArcadeLauncher.SW3
                                 var screenHeightPhysicalPostExit = (int)(screenHeightLogicalPostExit * dpiScaleFactor);
                                 System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysicalPostExit - 1, screenHeightPhysicalPostExit - 1);
                                 LogToFile($"Restored mouse cursor after emulated game exit: Moved to bottom-right pixel (physical): ({screenWidthPhysicalPostExit - 1}, {screenHeightPhysicalPostExit - 1})");
+
+                                // Clear the active process and state
+                                activeProcess = null;
+                                isGameActive = false;
                             });
                         };
                         emulatorProcess.Start();
+                        activeProcess = emulatorProcess; // Set the active process
                         LogToFile($"Launched emulated game: {cmd}");
                     }
                     else

@@ -450,7 +450,45 @@ namespace ArcadeLauncher.SW3
                 .OrderBy(g => g.AlphabetizeName)
                 .ToList();
             settings = DataManager.LoadSettings();
-            plugins = LoadPlugins();
+            plugins = LoadPlugins(); // Ensure this method is accessible
+        }
+
+        private List<IEmulatorPlugin> LoadPlugins()
+        {
+            // Get the directory of the executable
+            string exePath = AppDomain.CurrentDomain.BaseDirectory;
+            // Look for Plugins in the parent directory
+            string pluginDir = Path.Combine(exePath, "..", "Plugins");
+            pluginDir = Path.GetFullPath(pluginDir); // Resolve the path to avoid issues with relative paths
+            var pluginList = new List<IEmulatorPlugin>();
+
+            if (!Directory.Exists(pluginDir))
+            {
+                LogToFile($"Plugins directory not found: {pluginDir}");
+                return pluginList;
+            }
+
+            foreach (var dll in Directory.GetFiles(pluginDir, "*.dll"))
+            {
+                try
+                {
+                    var assembly = System.Reflection.Assembly.LoadFrom(dll);
+                    var types = assembly.GetTypes().Where(t => typeof(IEmulatorPlugin).IsAssignableFrom(t) && !t.IsInterface);
+                    foreach (var type in types)
+                    {
+                        if (Activator.CreateInstance(type) is IEmulatorPlugin plugin)
+                        {
+                            pluginList.Add(plugin);
+                            LogToFile($"Loaded plugin: {dll}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogToFile($"Failed to load plugin from {dll}: {ex.Message}");
+                }
+            }
+            return pluginList;
         }
 
         private void LogToFile(string message)
@@ -653,6 +691,12 @@ namespace ArcadeLauncher.SW3
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            // Unhook the keyboard hook before closing
+            if (hookId != IntPtr.Zero)
+            {
+                UnhookWindowsHookEx(hookId);
+                LogToFile("Keyboard hook unhooked.");
+            }
             // Close secondary windows to prevent them from lingering
             marqueeWindow?.Close();
             controllerWindow?.Close();

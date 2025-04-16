@@ -114,8 +114,8 @@ namespace ArcadeLauncher.SW2
             string initialMarqueeText = marqueeTextBox.Text;
             string initialControllerText = controllerTextBox.Text;
 
-            // Define Buttons (Left, Right, Up, Down, Select, Exit)
-            var buttonLabels = new string[] { "Left", "Right", "Up", "Down", "Select", "Exit" };
+            // Define Buttons (Left, Right, Up, Down, Select, Exit, Kill)
+            var buttonLabels = new string[] { "Left", "Right", "Up", "Down", "Select", "Exit", "Kill" };
             var buttonTextBoxes = new TextBox[buttonLabels.Length];
             var clearButtons = new Button[buttonLabels.Length];
             var captureButtons = new Button[buttonLabels.Length];
@@ -132,6 +132,11 @@ namespace ArcadeLauncher.SW2
                     Font = largeFont,
                     ReadOnly = true
                 };
+                if (!settings.InputMappings.ContainsKey(buttonLabels[i]))
+                {
+                    settings.InputMappings[buttonLabels[i]] = new List<string>(); // Initialize if missing
+                    Logger.LogToFile($"Initialized missing key in InputMappings: {buttonLabels[i]}");
+                }
                 if (settings.InputMappings.TryGetValue(buttonLabels[i], out var mappings))
                 {
                     textBox.Text = String.Join(", ", mappings.ToArray());
@@ -139,6 +144,7 @@ namespace ArcadeLauncher.SW2
                 else
                 {
                     textBox.Text = "";
+                    Logger.LogToFile($"Failed to retrieve mappings for key: {buttonLabels[i]}");
                 }
                 var clearButton = new Button { Text = "Clear", Top = currentTop, Left = column3Left, Width = buttonWidth, Height = buttonHeight, Font = largeFont };
                 var captureButton = new Button { Text = "Capture", Top = currentTop, Left = column3Left + buttonWidth + buttonGap, Width = buttonWidth, Height = buttonHeight, Font = largeFont };
@@ -146,94 +152,112 @@ namespace ArcadeLauncher.SW2
                 int index = i;
                 clearButton.Click += (s, e) =>
                 {
-                    settings.InputMappings[buttonLabels[index]] = new List<string>();
-                    textBox.Text = "";
+                    try
+                    {
+                        settings.InputMappings[buttonLabels[index]] = new List<string>();
+                        textBox.Text = "";
+                        Logger.LogToFile($"Cleared mappings for {buttonLabels[index]}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogToFile($"Error clearing mappings for {buttonLabels[index]}: {ex.Message}");
+                        MessageBox.Show($"Error clearing mappings: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 };
 
                 captureButton.Click += (s, e) =>
                 {
-                    var captureForm = new Form
+                    try
                     {
-                        Text = "",
-                        Size = new Size((int)(300 * scalingFactor), (int)(150 * scalingFactor)),
-                        StartPosition = FormStartPosition.CenterParent,
-                        MinimizeBox = false,
-                        MaximizeBox = false,
-                        ShowIcon = false,
-                        BackColor = ColorTranslator.FromHtml("#F3F3F3")
-                    };
-                    var captureLabel = new Label
-                    {
-                        Text = "Press a key to capture...",
-                        AutoSize = true,
-                        TextAlign = ContentAlignment.MiddleCenter,
-                        Font = largeFont
-                    };
-                    captureForm.Controls.Add(captureLabel);
-
-                    captureForm.Load += (sender, args) =>
-                    {
-                        captureLabel.Left = (captureForm.ClientSize.Width - captureLabel.Width) / 2;
-                        int totalHeight = captureForm.Height;
-                        int clientHeight = captureForm.ClientSize.Height;
-                        int titleBarHeight = SystemInformation.CaptionHeight;
-                        int topBorderHeight = SystemInformation.BorderSize.Height;
-                        int bottomBorderHeight = SystemInformation.BorderSize.Height;
-                        int nonClientHeightAbove = titleBarHeight + topBorderHeight;
-                        int nonClientHeightBelow = bottomBorderHeight;
-                        int visibleTotalHeight = clientHeight + nonClientHeightAbove + nonClientHeightBelow;
-                        int measuredVisibleTotalHeight = 105;
-                        int captureLabelHeight = captureLabel.Height;
-                        int totalCenterY = measuredVisibleTotalHeight / 2;
-                        int labelTop = totalCenterY - (captureLabelHeight / 2);
-                        captureLabel.Top = labelTop - nonClientHeightAbove;
-
-                        Logger.LogToFile($"Capture Key Pop-up Centering Diagnostics:");
-                        Logger.LogToFile($"  Total Height (including shadow): {totalHeight}");
-                        Logger.LogToFile($"  Client Height: {clientHeight}");
-                        Logger.LogToFile($"  Title Bar Height: {titleBarHeight}");
-                        Logger.LogToFile($"  Top Border Height: {topBorderHeight}");
-                        Logger.LogToFile($"  Bottom Border Height: {bottomBorderHeight}");
-                        Logger.LogToFile($"  Non-Client Height Above: {nonClientHeightAbove}");
-                        Logger.LogToFile($"  Non-Client Height Below: {nonClientHeightBelow}");
-                        Logger.LogToFile($"  Calculated Visible Total Height: {visibleTotalHeight}");
-                        Logger.LogToFile($"  Measured Visible Total Height: {measuredVisibleTotalHeight}");
-                        Logger.LogToFile($"  Label Height: {captureLabelHeight}");
-                        Logger.LogToFile($"  Total Center Y (measured): {totalCenterY}");
-                        Logger.LogToFile($"  Label Top (before adjustment): {labelTop}");
-                        Logger.LogToFile($"  Final Label Top: {captureLabel.Top}");
-                    };
-
-                    captureForm.KeyPreview = true;
-                    captureForm.KeyDown += (sender, args) =>
-                    {
-                        string keyString;
-                        switch (args.KeyCode)
+                        var captureForm = new Form
                         {
-                            case Keys.Left:
-                                keyString = "LeftArrow";
-                                break;
-                            case Keys.Right:
-                                keyString = "RightArrow";
-                                break;
-                            case Keys.Up:
-                                keyString = "UpArrow";
-                                break;
-                            case Keys.Down:
-                                keyString = "DownArrow";
-                                break;
-                            default:
-                                keyString = args.KeyCode.ToString();
-                                break;
-                        }
-                        if (!settings.InputMappings[buttonLabels[index]].Contains(keyString, StringComparer.OrdinalIgnoreCase))
+                            Text = "",
+                            Size = new Size((int)(300 * scalingFactor), (int)(150 * scalingFactor)),
+                            StartPosition = FormStartPosition.CenterParent,
+                            MinimizeBox = false,
+                            MaximizeBox = false,
+                            ShowIcon = false,
+                            BackColor = ColorTranslator.FromHtml("#F3F3F3")
+                        };
+                        var captureLabel = new Label
                         {
-                            settings.InputMappings[buttonLabels[index]].Add(keyString);
-                            textBox.Text = String.Join(", ", settings.InputMappings[buttonLabels[index]]);
-                        }
-                        captureForm.Close();
-                    };
-                    captureForm.ShowDialog();
+                            Text = "Press a key to capture...",
+                            AutoSize = true,
+                            TextAlign = ContentAlignment.MiddleCenter,
+                            Font = largeFont
+                        };
+                        captureForm.Controls.Add(captureLabel);
+
+                        captureForm.Load += (sender, args) =>
+                        {
+                            captureLabel.Left = (captureForm.ClientSize.Width - captureLabel.Width) / 2;
+                            int totalHeight = captureForm.Height;
+                            int clientHeight = captureForm.ClientSize.Height;
+                            int titleBarHeight = SystemInformation.CaptionHeight;
+                            int topBorderHeight = SystemInformation.BorderSize.Height;
+                            int bottomBorderHeight = SystemInformation.BorderSize.Height;
+                            int nonClientHeightAbove = titleBarHeight + topBorderHeight;
+                            int nonClientHeightBelow = bottomBorderHeight;
+                            int visibleTotalHeight = clientHeight + nonClientHeightAbove + nonClientHeightBelow;
+                            int measuredVisibleTotalHeight = 105;
+                            int captureLabelHeight = captureLabel.Height;
+                            int totalCenterY = measuredVisibleTotalHeight / 2;
+                            int labelTop = totalCenterY - (captureLabelHeight / 2);
+                            captureLabel.Top = labelTop - nonClientHeightAbove;
+
+                            Logger.LogToFile($"Capture Key Pop-up Centering Diagnostics:");
+                            Logger.LogToFile($"  Total Height (including shadow): {totalHeight}");
+                            Logger.LogToFile($"  Client Height: {clientHeight}");
+                            Logger.LogToFile($"  Title Bar Height: {titleBarHeight}");
+                            Logger.LogToFile($"  Top Border Height: {topBorderHeight}");
+                            Logger.LogToFile($"  Bottom Border Height: {bottomBorderHeight}");
+                            Logger.LogToFile($"  Non-Client Height Above: {nonClientHeightAbove}");
+                            Logger.LogToFile($"  Non-Client Height Below: {nonClientHeightBelow}");
+                            Logger.LogToFile($"  Calculated Visible Total Height: {visibleTotalHeight}");
+                            Logger.LogToFile($"  Measured Visible Total Height: {measuredVisibleTotalHeight}");
+                            Logger.LogToFile($"  Label Height: {captureLabelHeight}");
+                            Logger.LogToFile($"  Total Center Y (measured): {totalCenterY}");
+                            Logger.LogToFile($"  Label Top (before adjustment): {labelTop}");
+                            Logger.LogToFile($"  Final Label Top: {captureLabel.Top}");
+                        };
+
+                        captureForm.KeyPreview = true;
+                        captureForm.KeyDown += (sender, args) =>
+                        {
+                            string keyString;
+                            switch (args.KeyCode)
+                            {
+                                case Keys.Left:
+                                    keyString = "LeftArrow";
+                                    break;
+                                case Keys.Right:
+                                    keyString = "RightArrow";
+                                    break;
+                                case Keys.Up:
+                                    keyString = "UpArrow";
+                                    break;
+                                case Keys.Down:
+                                    keyString = "DownArrow";
+                                    break;
+                                default:
+                                    keyString = args.KeyCode.ToString();
+                                    break;
+                            }
+                            if (!settings.InputMappings[buttonLabels[index]].Contains(keyString, StringComparer.OrdinalIgnoreCase))
+                            {
+                                settings.InputMappings[buttonLabels[index]].Add(keyString);
+                                textBox.Text = String.Join(", ", settings.InputMappings[buttonLabels[index]]);
+                                Logger.LogToFile($"Captured key {keyString} for {buttonLabels[index]}");
+                            }
+                            captureForm.Close();
+                        };
+                        captureForm.ShowDialog();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogToFile($"Error capturing key for {buttonLabels[index]}: {ex.Message}");
+                        MessageBox.Show($"Error capturing key: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 };
 
                 buttonTextBoxes[index] = textBox;
@@ -245,6 +269,13 @@ namespace ArcadeLauncher.SW2
                 mainPanel.Controls.Add(clearButton);
                 mainPanel.Controls.Add(captureButton);
                 currentTop += rowHeight;
+            }
+
+            // Special handling for "Kill" label to indicate (x2)
+            var killLabel = mainPanel.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Define Kill Button(s)");
+            if (killLabel != null)
+            {
+                killLabel.Text = "Define Kill Button(s) (x2)";
             }
 
             // Save and Cancel Buttons
@@ -354,6 +385,18 @@ namespace ArcadeLauncher.SW2
             mainPanel.Controls.Add(controllerButton);
             mainPanel.Controls.Add(saveSettingsButton);
             mainPanel.Controls.Add(cancelSettingsButton);
+            foreach (var textBox in buttonTextBoxes)
+            {
+                mainPanel.Controls.Add(textBox);
+            }
+            foreach (var clearButton in clearButtons)
+            {
+                mainPanel.Controls.Add(clearButton);
+            }
+            foreach (var captureButton in captureButtons)
+            {
+                mainPanel.Controls.Add(captureButton);
+            }
         }
 
         private async Task SearchCoverArt(string gameName, PictureBox artBoxPictureBox, Game game)
