@@ -156,11 +156,11 @@ namespace ArcadeLauncher.SW2
                     {
                         settings.InputMappings[buttonLabels[index]] = new List<string>();
                         textBox.Text = "";
-                        Logger.LogToFile($"Cleared mappings for {buttonLabels[index]}");
+                        Logger.LogToFile($"Cleared mappings for {buttonLabels[i]}");
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogToFile($"Error clearing mappings for {buttonLabels[index]}: {ex.Message}");
+                        Logger.LogToFile($"Error clearing mappings for {buttonLabels[i]}: {ex.Message}");
                         MessageBox.Show($"Error clearing mappings: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 };
@@ -247,7 +247,7 @@ namespace ArcadeLauncher.SW2
                             {
                                 settings.InputMappings[buttonLabels[index]].Add(keyString);
                                 textBox.Text = String.Join(", ", settings.InputMappings[buttonLabels[index]]);
-                                Logger.LogToFile($"Captured key {keyString} for {buttonLabels[index]}");
+                                Logger.LogToFile($"Captured key {keyString} for {buttonLabels[i]}");
                             }
                             captureForm.Close();
                         };
@@ -255,7 +255,7 @@ namespace ArcadeLauncher.SW2
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogToFile($"Error capturing key for {buttonLabels[index]}: {ex.Message}");
+                        Logger.LogToFile($"Error capturing key for {buttonLabels[i]}: {ex.Message}");
                         MessageBox.Show($"Error capturing key: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 };
@@ -552,8 +552,9 @@ namespace ArcadeLauncher.SW2
                     var gameDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ArcadeLauncher", "Assets", uniqueFolderName);
                     Logger.LogToFile($"Creating directory for game assets: {gameDir}");
                     Directory.CreateDirectory(gameDir);
-                    var destPath = Path.Combine(gameDir, $"{assetType}.png");
-                    Logger.LogToFile($"Destination path for {assetType}: {destPath}");
+                    var destPath = Path.Combine(gameDir, $"{assetType}.png"); // Full 1920x1080 for SW3
+                    var previewPath = Path.Combine(gameDir, $"{assetType}Preview.png"); // Cropped 1920x360 for preview
+                    Logger.LogToFile($"Destination path for {assetType}: {destPath}, Preview path: {previewPath}");
 
                     // Dispose of the current image in the PictureBox
                     if (pictureBox.Image != null)
@@ -563,7 +564,7 @@ namespace ArcadeLauncher.SW2
                         pictureBox.Image = null;
                     }
 
-                    // Copy with retry mechanism
+                    // Copy the original image with retry mechanism
                     bool copied = false;
                     for (int i = 0; i < 5 && !copied; i++)
                     {
@@ -587,11 +588,30 @@ namespace ArcadeLauncher.SW2
                         }
                     }
 
-                    // Load the new image into the PictureBox
-                    Logger.LogToFile($"Loading new image into PictureBox from: {destPath}");
-                    pictureBox.Image = Image.FromFile(destPath);
+                    // Crop the top 360 pixels to create the preview image
+                    using (var tempImage = Image.FromFile(destPath))
+                    {
+                        using (var sourceImage = new Bitmap(tempImage))
+                        {
+                            // Create a new bitmap and crop the top 360 pixels
+                            Rectangle cropRect = new Rectangle(0, 0, 1920, 360); // Crop the top 360 pixels
+                            using (var croppedBitmap = new Bitmap(1920, 360))
+                            {
+                                using (Graphics g = Graphics.FromImage(croppedBitmap))
+                                {
+                                    g.DrawImage(sourceImage, new Rectangle(0, 0, 1920, 360), cropRect, GraphicsUnit.Pixel);
+                                }
+                                croppedBitmap.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
+                                Logger.LogToFile($"Saved cropped preview image to: {previewPath} with dimensions: {croppedBitmap.Width}x{croppedBitmap.Height}");
+                            }
+                        }
+                    }
 
-                    // Update the game's paths
+                    // Load the preview image into the PictureBox
+                    Logger.LogToFile($"Loading preview image into PictureBox from: {previewPath}");
+                    pictureBox.Image = Image.FromFile(previewPath);
+
+                    // Update the game's paths (store the full image path for SW3 compatibility)
                     if (assetType == "ArtBox")
                     {
                         game.ArtBoxPath = destPath;

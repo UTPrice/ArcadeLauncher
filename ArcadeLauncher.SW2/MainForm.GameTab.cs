@@ -99,11 +99,11 @@ namespace ArcadeLauncher.SW2
             double artboxAllocation = availableHeight - (4 * marginAndGapRounded);
             double totalHeightRatio = 4.0 / 3.0 + 3.0 / 16.0 + 9.0 / 16.0;
             int thumbnailWidth = (int)Math.Round(artboxAllocation / totalHeightRatio);
+            // Adjust marqueeHeight to match 1920x360 aspect ratio (5.33:1)
+            int marqueeHeight = (int)Math.Round(thumbnailWidth * (360.0 / 1920.0));
             double artBoxAspect = 4.0 / 3.0;
-            double marqueeAspect = 3.0 / 16.0;
             double controllerAspect = 9.0 / 16.0;
             int artBoxHeight = (int)Math.Round(thumbnailWidth * artBoxAspect);
-            int marqueeHeight = (int)Math.Round(thumbnailWidth * marqueeAspect);
             int controllerHeight = (int)Math.Round(thumbnailWidth * controllerAspect);
 
             int screenWidth = Screen.PrimaryScreen.WorkingArea.Width;
@@ -123,11 +123,21 @@ namespace ArcadeLauncher.SW2
                         artBoxImage = new Bitmap(tempImage); // Create a new Bitmap to avoid keeping the file handle open
                     }
                 }
-                if (File.Exists(game.MarqueePath))
+                string previewPath = game.MarqueePath.Replace(".png", "Preview.png");
+                if (File.Exists(previewPath))
                 {
+                    Logger.LogToFile($"Loading preview image from: {previewPath}");
+                    using (var tempImage = Image.FromFile(previewPath))
+                    {
+                        marqueeImage = new Bitmap(tempImage); // Load the 1920x360 preview version
+                    }
+                }
+                else if (File.Exists(game.MarqueePath))
+                {
+                    Logger.LogToFile($"Preview not found, falling back to full image: {game.MarqueePath}");
                     using (var tempImage = Image.FromFile(game.MarqueePath))
                     {
-                        marqueeImage = new Bitmap(tempImage);
+                        marqueeImage = new Bitmap(tempImage); // Fallback to full image if preview not available
                     }
                 }
                 if (File.Exists(game.ControllerLayoutPath))
@@ -161,7 +171,7 @@ namespace ArcadeLauncher.SW2
                 Height = marqueeHeight,
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.Black,
-                SizeMode = PictureBoxSizeMode.StretchImage,
+                SizeMode = PictureBoxSizeMode.StretchImage, // Use StretchImage to eliminate black margins
                 Padding = new Padding(0),
                 Image = marqueeImage
             };
@@ -506,6 +516,18 @@ namespace ArcadeLauncher.SW2
                             catch (Exception ex)
                             {
                                 Logger.LogToFile($"Failed to remove artwork file {game.MarqueePath}: {ex.Message}");
+                            }
+                        }
+                        if (File.Exists(game.MarqueePath.Replace(".png", "Preview.png")))
+                        {
+                            try
+                            {
+                                File.Delete(game.MarqueePath.Replace(".png", "Preview.png"));
+                                Logger.LogToFile($"Removed preview artwork file: {game.MarqueePath.Replace(".png", "Preview.png")}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogToFile($"Failed to remove preview artwork file {game.MarqueePath.Replace(".png", "Preview.png")}: {ex.Message}");
                             }
                         }
                         marqueePictureBox.Image?.Dispose();
