@@ -444,7 +444,10 @@ namespace ArcadeLauncher.SW3
 
         private void LoadData()
         {
-            games = DataManager.LoadGameData().Games.OrderBy(g => g.AlphabetizeName).ToList();
+            games = DataManager.LoadGameData().Games
+                .Where(g => !g.IsInProgress) // Filter out games where IsInProgress is true
+                .OrderBy(g => g.AlphabetizeName)
+                .ToList();
             settings = DataManager.LoadSettings();
             plugins = LoadPlugins();
         }
