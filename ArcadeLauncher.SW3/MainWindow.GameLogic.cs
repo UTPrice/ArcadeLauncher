@@ -193,6 +193,29 @@ namespace ArcadeLauncher.SW3
         {
             try
             {
+                // Log the game launch details
+                LogToFile($"Launching game: {game.DisplayName}, HideMouseCursor: {game.HideMouseCursor}");
+
+                // Adjust cursor position based on HideMouseCursor setting
+                var screenWidthLogical = SystemParameters.PrimaryScreenWidth;
+                var screenHeightLogical = SystemParameters.PrimaryScreenHeight;
+                var screenWidthPhysical = (int)(screenWidthLogical * dpiScaleFactor);
+                var screenHeightPhysical = (int)(screenHeightLogical * dpiScaleFactor);
+
+                if (game.HideMouseCursor)
+                {
+                    // Leave the cursor in the bottom-right corner (already positioned there)
+                    LogToFile($"HideMouseCursor is true, leaving cursor at bottom-right pixel (physical): ({screenWidthPhysical - 1}, {screenHeightPhysical - 1})");
+                }
+                else
+                {
+                    // Move the cursor to the center of the screen
+                    int centerX = screenWidthPhysical / 2;
+                    int centerY = screenHeightPhysical / 2;
+                    System.Windows.Forms.Cursor.Position = new System.Drawing.Point(centerX, centerY);
+                    LogToFile($"HideMouseCursor is false, moved cursor to center of screen (physical): ({centerX}, {centerY})");
+                }
+
                 // Update Monitor #2 and #3
                 if (marqueeWindow != null && marqueeWindow.Content is System.Windows.Controls.Image marqueeImage)
                 {
@@ -245,6 +268,14 @@ namespace ArcadeLauncher.SW3
                             {
                                 RunCommand(cmd, "Post-Exit Command");
                             }
+
+                            // Tuck the cursor back to the bottom-right corner after game exit
+                            var screenWidthLogicalPostExit = SystemParameters.PrimaryScreenWidth;
+                            var screenHeightLogicalPostExit = SystemParameters.PrimaryScreenHeight;
+                            var screenWidthPhysicalPostExit = (int)(screenWidthLogicalPostExit * dpiScaleFactor);
+                            var screenHeightPhysicalPostExit = (int)(screenHeightLogicalPostExit * dpiScaleFactor);
+                            System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysicalPostExit - 1, screenHeightPhysicalPostExit - 1);
+                            LogToFile($"Restored mouse cursor after PC game exit: Moved to bottom-right pixel (physical): ({screenWidthPhysicalPostExit - 1}, {screenHeightPhysicalPostExit - 1})");
                         });
                     };
                     gameProcess.Start();
@@ -284,6 +315,14 @@ namespace ArcadeLauncher.SW3
                                 {
                                     RunCommand(cmd, "Post-Exit Command");
                                 }
+
+                                // Tuck the cursor back to the bottom-right corner after game exit
+                                var screenWidthLogicalPostExit = SystemParameters.PrimaryScreenWidth;
+                                var screenHeightLogicalPostExit = SystemParameters.PrimaryScreenHeight;
+                                var screenWidthPhysicalPostExit = (int)(screenWidthLogicalPostExit * dpiScaleFactor);
+                                var screenHeightPhysicalPostExit = (int)(screenHeightLogicalPostExit * dpiScaleFactor);
+                                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysicalPostExit - 1, screenHeightPhysicalPostExit - 1);
+                                LogToFile($"Restored mouse cursor after emulated game exit: Moved to bottom-right pixel (physical): ({screenWidthPhysicalPostExit - 1}, {screenHeightPhysicalPostExit - 1})");
                             });
                         };
                         emulatorProcess.Start();
@@ -320,6 +359,14 @@ namespace ArcadeLauncher.SW3
                     }
                 };
                 messageBox.ShowDialog();
+
+                // Tuck the cursor back to the bottom-right corner after launch failure
+                var screenWidthLogicalPostFailure = SystemParameters.PrimaryScreenWidth;
+                var screenHeightLogicalPostFailure = SystemParameters.PrimaryScreenHeight;
+                var screenWidthPhysicalPostFailure = (int)(screenWidthLogicalPostFailure * dpiScaleFactor);
+                var screenHeightPhysicalPostFailure = (int)(screenHeightLogicalPostFailure * dpiScaleFactor);
+                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysicalPostFailure - 1, screenHeightPhysicalPostFailure - 1);
+                LogToFile($"Restored mouse cursor after launch failure: Moved to bottom-right pixel (physical): ({screenWidthPhysicalPostFailure - 1}, {screenHeightPhysicalPostFailure - 1})");
             }
         }
     }

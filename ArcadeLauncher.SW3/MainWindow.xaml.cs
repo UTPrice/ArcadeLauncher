@@ -117,12 +117,13 @@ namespace ArcadeLauncher.SW3
 
                 SetupUI();
 
-                // Move the mouse cursor to the bottom-right pixel of the primary screen
-                var screenWidth = SystemParameters.PrimaryScreenWidth;
-                var screenHeight = SystemParameters.PrimaryScreenHeight;
-                Mouse.OverrideCursor = System.Windows.Input.Cursors.None; // Hide cursor
-                System.Windows.Forms.Cursor.Position = new System.Drawing.Point((int)screenWidth - 1, (int)screenHeight - 1);
-                LogToFile($"Moved cursor to bottom-right pixel: ({screenWidth - 1}, {screenHeight - 1})");
+                // Move the mouse cursor to the bottom-right pixel of the primary screen in physical pixels
+                var screenWidthLogical = SystemParameters.PrimaryScreenWidth;
+                var screenHeightLogical = SystemParameters.PrimaryScreenHeight;
+                var screenWidthPhysical = (int)(screenWidthLogical * dpiScaleFactor);
+                var screenHeightPhysical = (int)(screenHeightLogical * dpiScaleFactor);
+                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysical - 1, screenHeightPhysical - 1);
+                LogToFile($"Initialized mouse cursor: Made visible and moved to bottom-right pixel (physical): ({screenWidthPhysical - 1}, {screenHeightPhysical - 1})");
 
                 // Setup monitors after ensuring the main window is initialized
                 SetupMonitors();
