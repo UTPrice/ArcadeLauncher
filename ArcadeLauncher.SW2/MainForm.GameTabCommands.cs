@@ -64,7 +64,7 @@ namespace ArcadeLauncher.SW2
                     postCloseMinusButtons[j].Top -= inputHeight;
                     postClosePlusButtons[j].Top -= inputHeight;
                 }
-                // Adjust Notes and In Progress section positions
+                // Adjust Notes, In Progress, and Hide Mouse Cursor section positions
                 if (notesLabel != null)
                 {
                     notesLabel.Top -= inputHeight;
@@ -82,6 +82,16 @@ namespace ArcadeLauncher.SW2
                 if (inProgressCheckBox != null)
                 {
                     inProgressCheckBox.Top -= inputHeight;
+                }
+                var hideMouseCursorLabel = mainPanel.Controls.OfType<Label>().FirstOrDefault(c => c.Text == "Hide Mouse Cursor");
+                if (hideMouseCursorLabel != null)
+                {
+                    hideMouseCursorLabel.Top -= inputHeight;
+                }
+                var hideMouseCursorCheckBox = mainPanel.Controls.OfType<CheckBox>().FirstOrDefault(c => c.Name == "hideMouseCursorCheckBox");
+                if (hideMouseCursorCheckBox != null)
+                {
+                    hideMouseCursorCheckBox.Top -= inputHeight;
                 }
                 saveButton.Top -= inputHeight;
                 cancelButton.Top -= inputHeight;
@@ -128,7 +138,7 @@ namespace ArcadeLauncher.SW2
                 postCloseMinusButtons[j].Top += inputHeight;
                 postClosePlusButtons[j].Top += inputHeight;
             }
-            // Adjust Notes and In Progress section positions
+            // Adjust Notes, In Progress, and Hide Mouse Cursor section positions
             if (notesLabel != null)
             {
                 notesLabel.Top += inputHeight;
@@ -146,6 +156,16 @@ namespace ArcadeLauncher.SW2
             if (inProgressCheckBox != null)
             {
                 inProgressCheckBox.Top += inputHeight;
+            }
+            var hideMouseCursorLabel = mainPanel.Controls.OfType<Label>().FirstOrDefault(c => c.Text == "Hide Mouse Cursor");
+            if (hideMouseCursorLabel != null)
+            {
+                hideMouseCursorLabel.Top += inputHeight;
+            }
+            var hideMouseCursorCheckBox = mainPanel.Controls.OfType<CheckBox>().FirstOrDefault(c => c.Name == "hideMouseCursorCheckBox");
+            if (hideMouseCursorCheckBox != null)
+            {
+                hideMouseCursorCheckBox.Top += inputHeight;
             }
             saveButton.Top += inputHeight;
             cancelButton.Top += inputHeight;
@@ -203,7 +223,7 @@ namespace ArcadeLauncher.SW2
                     postCloseMinusButtons[j].Top -= inputHeight;
                     postClosePlusButtons[j].Top -= inputHeight;
                 }
-                // Adjust Notes and In Progress section positions
+                // Adjust Notes, In Progress, and Hide Mouse Cursor section positions
                 if (notesLabel != null)
                 {
                     notesLabel.Top -= inputHeight;
@@ -221,6 +241,16 @@ namespace ArcadeLauncher.SW2
                 if (inProgressCheckBox != null)
                 {
                     inProgressCheckBox.Top -= inputHeight;
+                }
+                var hideMouseCursorLabel = mainPanel.Controls.OfType<Label>().FirstOrDefault(c => c.Text == "Hide Mouse Cursor");
+                if (hideMouseCursorLabel != null)
+                {
+                    hideMouseCursorLabel.Top -= inputHeight;
+                }
+                var hideMouseCursorCheckBox = mainPanel.Controls.OfType<CheckBox>().FirstOrDefault(c => c.Name == "hideMouseCursorCheckBox");
+                if (hideMouseCursorCheckBox != null)
+                {
+                    hideMouseCursorCheckBox.Top -= inputHeight;
                 }
                 saveButton.Top -= inputHeight;
                 cancelButton.Top -= inputHeight;
@@ -260,7 +290,7 @@ namespace ArcadeLauncher.SW2
             mainPanel.Controls.Add(newMinusButton);
             mainPanel.Controls.Add(newPlusButton);
 
-            // Adjust Notes and In Progress section positions
+            // Adjust Notes, In Progress, and Hide Mouse Cursor section positions
             if (notesLabel != null)
             {
                 notesLabel.Top += inputHeight;
@@ -278,6 +308,16 @@ namespace ArcadeLauncher.SW2
             if (inProgressCheckBox != null)
             {
                 inProgressCheckBox.Top += inputHeight;
+            }
+            var hideMouseCursorLabel = mainPanel.Controls.OfType<Label>().FirstOrDefault(c => c.Text == "Hide Mouse Cursor");
+            if (hideMouseCursorLabel != null)
+            {
+                hideMouseCursorLabel.Top += inputHeight;
+            }
+            var hideMouseCursorCheckBox = mainPanel.Controls.OfType<CheckBox>().FirstOrDefault(c => c.Name == "hideMouseCursorCheckBox");
+            if (hideMouseCursorCheckBox != null)
+            {
+                hideMouseCursorCheckBox.Top += inputHeight;
             }
             saveButton.Top += inputHeight;
             cancelButton.Top += inputHeight;
@@ -298,6 +338,7 @@ namespace ArcadeLauncher.SW2
             var executableTextBox = mainPanel.Controls.OfType<CustomTextBox>().FirstOrDefault(c => c.Name == "executableTextBox");
             var ledBlinkyTextBox = mainPanel.Controls.OfType<CustomTextBox>().FirstOrDefault(c => c.Name == "ledBlinkyTextBox");
             var inProgressCheckBox = mainPanel.Controls.OfType<CheckBox>().FirstOrDefault(c => c.Name == "inProgressCheckBox");
+            var hideMouseCursorCheckBox = mainPanel.Controls.OfType<CheckBox>().FirstOrDefault(c => c.Name == "hideMouseCursorCheckBox");
 
             if (displayNameTextBox != null) game.DisplayName = displayNameTextBox.Text;
             if (alphabetizeNameTextBox != null) game.AlphabetizeName = alphabetizeNameTextBox.Text;
@@ -306,9 +347,10 @@ namespace ArcadeLauncher.SW2
             if (ledBlinkyTextBox != null) game.LEDBlinkyCommand = ledBlinkyTextBox.Text;
             if (notesTextBox != null) game.Notes = notesTextBox.Text; // Save the Notes field
             if (inProgressCheckBox != null) game.IsInProgress = inProgressCheckBox.Checked; // Save the In Progress status
+            if (hideMouseCursorCheckBox != null) game.HideMouseCursor = hideMouseCursorCheckBox.Checked; // Save the Hide Mouse Cursor setting
 
             // Log the basic properties
-            Logger.LogToFile($"Saved basic properties: DisplayName={game.DisplayName}, AlphabetizeName={game.AlphabetizeName}, Type={game.Type}, ExecutablePath={game.ExecutablePath}, LEDBlinkyCommand={game.LEDBlinkyCommand}, ArtBoxPath={game.ArtBoxPath}, Notes={game.Notes}, IsInProgress={game.IsInProgress}");
+            Logger.LogToFile($"Saved basic properties: DisplayName={game.DisplayName}, AlphabetizeName={game.AlphabetizeName}, Type={game.Type}, ExecutablePath={game.ExecutablePath}, LEDBlinkyCommand={game.LEDBlinkyCommand}, ArtBoxPath={game.ArtBoxPath}, Notes={game.Notes}, IsInProgress={game.IsInProgress}, HideMouseCursor={game.HideMouseCursor}");
 
             // Collect Pre-Launch Commands using Tag
             var preLaunchCommandsList = new List<string>();

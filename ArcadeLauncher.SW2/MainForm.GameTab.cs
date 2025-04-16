@@ -370,7 +370,7 @@ namespace ArcadeLauncher.SW2
             };
             currentTop += notesTextBox.Height + sectionGap; // Adjust for the taller TextBox
 
-            // In Progress Checkbox (below Notes, above Save/Cancel buttons)
+            // In Progress Checkbox (below Notes, above Hide Mouse Cursor)
             var inProgressLabel = new Label
             {
                 Text = "In Progress",
@@ -393,7 +393,30 @@ namespace ArcadeLauncher.SW2
             };
             currentTop += inputHeight + sectionGap; // Adjust for the checkbox height
 
-            // Save and Cancel Buttons (moved down to accommodate In Progress section)
+            // Hide Mouse Cursor Checkbox (below In Progress, above Save/Cancel buttons)
+            var hideMouseCursorLabel = new Label
+            {
+                Text = "Hide Mouse Cursor",
+                Top = currentTop,
+                Left = column1Left,
+                Width = labelWidth,
+                Height = labelHeight,
+                Font = largeFont,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(0)
+            };
+            var hideMouseCursorCheckBox = new CheckBox
+            {
+                Top = currentTop,
+                Left = column2Left,
+                Width = inputWidth,
+                Height = inputHeight,
+                Checked = game?.HideMouseCursor ?? false, // Default to unchecked unless specified
+                Name = "hideMouseCursorCheckBox"
+            };
+            currentTop += inputHeight + sectionGap; // Adjust for the checkbox height
+
+            // Save and Cancel Buttons (moved down to accommodate new Hide Mouse Cursor section)
             saveButton = new CustomButton { Text = "Save Game", Top = currentTop, Left = column1Left, Width = saveCancelButtonWidth, Height = saveCancelButtonHeight, Font = largeFont }; // Use CustomButton
             cancelButton = new CustomButton { Text = "Cancel", Top = currentTop, Left = column1Left + saveCancelButtonWidth + columnGap, Width = saveCancelButtonWidth, Height = saveCancelButtonHeight, Font = largeFont }; // Use CustomButton
             currentTop += sectionGap + inputHeight;
@@ -572,6 +595,8 @@ namespace ArcadeLauncher.SW2
             mainPanel.Controls.Add(notesTextBox);
             mainPanel.Controls.Add(inProgressLabel); // Add In Progress label
             mainPanel.Controls.Add(inProgressCheckBox); // Add In Progress checkbox
+            mainPanel.Controls.Add(hideMouseCursorLabel); // Add Hide Mouse Cursor label
+            mainPanel.Controls.Add(hideMouseCursorCheckBox); // Add Hide Mouse Cursor checkbox
             mainPanel.Controls.Add(saveButton);
             mainPanel.Controls.Add(cancelButton);
             mainPanel.Controls.Add(artBoxPictureBox);

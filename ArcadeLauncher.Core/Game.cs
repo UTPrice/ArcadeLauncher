@@ -20,10 +20,11 @@ namespace ArcadeLauncher.Core
         public string LEDBlinkyCommand { get; set; } = "";
         public string Notes { get; set; } = "";
         public bool IsInProgress { get; set; } = false; // Added property with default false
+        public bool HideMouseCursor { get; set; } = false; // Added property with default false
 
         public override string ToString()
         {
-            return DisplayName ?? "Unnamed Game";
+            return $"{DisplayName ?? "Unnamed Game"} (IsInProgress: {IsInProgress}, HideMouseCursor: {HideMouseCursor})";
         }
     }
 
