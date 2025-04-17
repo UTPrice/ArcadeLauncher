@@ -10,8 +10,6 @@ namespace ArcadeLauncher.SW2
 {
     public partial class MainForm : Form
     {
-        // Removed duplicate definition: private TextBox notesTextBox;
-
         private void SetupGameView(Game game, bool isNewGame)
         {
             // Dispose of existing PictureBox images before clearing the panel
@@ -45,50 +43,45 @@ namespace ArcadeLauncher.SW2
             mainPanel.Visible = false;
             Logger.LogToFile("Set mainPanel.Visible = false to prevent partial rendering during SetupGameView.");
 
-            mainPanel.SuspendLayout(); // Suspend layout updates to prevent flickering (Ticket 04)
+            mainPanel.SuspendLayout();
             mainPanel.Controls.Clear();
             mainPanel.Tag = game;
             mainPanel.AutoScroll = true;
             mainPanel.Padding = new Padding(0);
 
-            // Calculate scaling factor based on screen height (reference: 1080p)
             double scalingFactor = (double)Screen.PrimaryScreen.WorkingArea.Height / 1080;
 
-            // Determine actual input height by creating a temporary TextBox in an off-screen Panel
-            using (var tempPanel = new Panel { Visible = false }) // Off-screen panel
+            using (var tempPanel = new Panel { Visible = false })
             using (var tempTextBox = new CustomTextBox { Font = largeFont })
             {
-                tempPanel.Controls.Add(tempTextBox); // Add to off-screen panel
-                inputHeight = tempTextBox.Height; // Get the actual rendered height
+                tempPanel.Controls.Add(tempTextBox);
+                inputHeight = tempTextBox.Height;
             }
 
-            // Scale all fixed-size elements
             int gameListWidth = (int)(375 * scalingFactor);
             gameList.Width = gameListWidth;
-            int labelWidth = (int)(200 * scalingFactor); // Increased from 150 to 200 to prevent clipping
-            inputWidth = (int)(690 * 1.12 * scalingFactor); // 690 * 1.12 = 772.8, rounded to 773, then scaled
-            int labelHeight = inputHeight; // Match label height to input box height
+            int labelWidth = (int)(200 * scalingFactor);
+            inputWidth = (int)(690 * 1.12 * scalingFactor);
+            int labelHeight = inputHeight;
 
-            // Calculate the required width for the "Browse" button using an off-screen panel to prevent flicker
             int buttonWidth;
-            using (var tempPanel = new Panel { Visible = false }) // Off-screen panel
+            using (var tempPanel = new Panel { Visible = false })
             using (var tempButton = new CustomButton { Text = "Browse", Font = largeFont })
             {
-                tempPanel.Controls.Add(tempButton); // Add to off-screen panel
-                buttonWidth = TextRenderer.MeasureText("Browse", largeFont).Width + (int)(20 * scalingFactor); // Add padding for button margins
+                tempPanel.Controls.Add(tempButton);
+                buttonWidth = TextRenderer.MeasureText("Browse", largeFont).Width + (int)(20 * scalingFactor);
             }
 
-            int buttonHeight = inputHeight; // Match input box height
-            smallButtonWidth = inputHeight; // Make Plus/Minus buttons square
-            smallButtonHeight = inputHeight; // Match input box height
+            int buttonHeight = inputHeight;
+            smallButtonWidth = inputHeight;
+            smallButtonHeight = inputHeight;
             int saveCancelButtonWidth = (int)(100 * scalingFactor);
-            int saveCancelButtonHeight = inputHeight; // Match input box height
+            int saveCancelButtonHeight = inputHeight;
             int columnGap = (int)(10 * scalingFactor);
             int rowHeight = (int)(50 * scalingFactor);
-            smallButtonGap = (int)(5 * scalingFactor); // Gap between minus and plus buttons (reduced from 28 to 5 pixels)
-            int sectionGap = (int)(18 * scalingFactor); // Desired gap between sections (18 pixels at 1080p, scaled)
+            smallButtonGap = (int)(5 * scalingFactor);
+            int sectionGap = (int)(18 * scalingFactor);
 
-            // Artwork (right side) - Calculate first to get artBoxPictureBox.Top
             int topRibbonHeight = toolStrip.Height;
             int taskbarHeight = Screen.PrimaryScreen.Bounds.Height - Screen.PrimaryScreen.WorkingArea.Height;
             int titleBarHeight = SystemInformation.CaptionHeight;
@@ -99,10 +92,9 @@ namespace ArcadeLauncher.SW2
             double artboxAllocation = availableHeight - (4 * marginAndGapRounded);
             double totalHeightRatio = 4.0 / 3.0 + 3.0 / 16.0 + 9.0 / 16.0;
             int thumbnailWidth = (int)Math.Round(artboxAllocation / totalHeightRatio);
-            // Adjust marqueeHeight to match 1920x360 aspect ratio (5.33:1)
             int marqueeHeight = (int)Math.Round(thumbnailWidth * (360.0 / 1920.0));
             double artBoxAspect = 4.0 / 3.0;
-            double controllerAspect = 9.0 / 16.0;
+            double controllerAspect = 9.0 / 16.0; // Revert to original aspect ratio for preview height
             int artBoxHeight = (int)Math.Round(thumbnailWidth * artBoxAspect);
             int controllerHeight = (int)Math.Round(thumbnailWidth * controllerAspect);
 
@@ -110,17 +102,16 @@ namespace ArcadeLauncher.SW2
             int artworkLeft = screenWidth - gameList.Width - thumbnailWidth - marginAndGapRounded;
             int artworkTop = marginAndGapRounded;
 
-            // Preload artwork images to avoid flickering during layout (Ticket 04)
             Image artBoxImage = null;
             Image marqueeImage = null;
-            Image controllerImage = null;
+            Image splashScreenImage = null;
             if (game != null)
             {
                 if (File.Exists(game.ArtBoxPath))
                 {
                     using (var tempImage = Image.FromFile(game.ArtBoxPath))
                     {
-                        artBoxImage = new Bitmap(tempImage); // Create a new Bitmap to avoid keeping the file handle open
+                        artBoxImage = new Bitmap(tempImage);
                     }
                 }
                 string previewPath = game.MarqueePath.Replace(".png", "Preview.png");
@@ -129,7 +120,7 @@ namespace ArcadeLauncher.SW2
                     Logger.LogToFile($"Loading preview image from: {previewPath}");
                     using (var tempImage = Image.FromFile(previewPath))
                     {
-                        marqueeImage = new Bitmap(tempImage); // Load the 1920x360 preview version
+                        marqueeImage = new Bitmap(tempImage);
                     }
                 }
                 else if (File.Exists(game.MarqueePath))
@@ -137,19 +128,26 @@ namespace ArcadeLauncher.SW2
                     Logger.LogToFile($"Preview not found, falling back to full image: {game.MarqueePath}");
                     using (var tempImage = Image.FromFile(game.MarqueePath))
                     {
-                        marqueeImage = new Bitmap(tempImage); // Fallback to full image if preview not available
+                        marqueeImage = new Bitmap(tempImage);
                     }
                 }
-                if (File.Exists(game.ControllerLayoutPath))
+                if (game.SplashScreenPath.ContainsKey("1440p") && File.Exists(game.SplashScreenPath["1440p"]))
                 {
-                    using (var tempImage = Image.FromFile(game.ControllerLayoutPath))
+                    using (var tempImage = Image.FromFile(game.SplashScreenPath["1440p"]))
                     {
-                        controllerImage = new Bitmap(tempImage);
+                        splashScreenImage = new Bitmap(tempImage);
+                    }
+                }
+                else if (game.SplashScreenPath.ContainsKey("1080p") && File.Exists(game.SplashScreenPath["1080p"]))
+                {
+                    using (var tempImage = Image.FromFile(game.SplashScreenPath["1080p"]))
+                    {
+                        splashScreenImage = new Bitmap(tempImage);
                     }
                 }
             }
 
-            var artBoxPictureBox = new CustomPictureBox // Use CustomPictureBox
+            var artBoxPictureBox = new CustomPictureBox
             {
                 Top = artworkTop,
                 Left = artworkLeft,
@@ -163,7 +161,7 @@ namespace ArcadeLauncher.SW2
             };
             artworkTop += artBoxHeight + marginAndGapRounded;
 
-            var marqueePictureBox = new CustomPictureBox // Use CustomPictureBox
+            var marqueePictureBox = new CustomPictureBox
             {
                 Top = artworkTop,
                 Left = artworkLeft,
@@ -171,55 +169,45 @@ namespace ArcadeLauncher.SW2
                 Height = marqueeHeight,
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.Black,
-                SizeMode = PictureBoxSizeMode.StretchImage, // Use StretchImage to eliminate black margins
+                SizeMode = PictureBoxSizeMode.StretchImage,
                 Padding = new Padding(0),
                 Image = marqueeImage
             };
             artworkTop += marqueeHeight + marginAndGapRounded;
 
-            var controllerPictureBox = new CustomPictureBox // Use CustomPictureBox
+            var splashScreenPictureBox = new CustomPictureBox
             {
                 Top = artworkTop,
                 Left = artworkLeft,
                 Width = thumbnailWidth,
-                Height = controllerHeight,
+                Height = controllerHeight, // Use the original controllerHeight for consistency
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.Black,
                 SizeMode = PictureBoxSizeMode.StretchImage,
                 Padding = new Padding(0),
-                Image = controllerImage
+                Image = splashScreenImage
             };
 
-            // Column 1 and 2 controls - Align first input box with first artbox
             int currentTop = artBoxPictureBox.Top;
 
-            // Calculate the total width of the columns (Label + Gap + Input + Gap + Browse Button)
             int totalColumnsWidth = labelWidth + columnGap + inputWidth + columnGap + buttonWidth;
-
-            // Calculate the available space between the right edge of the Game List and the left edge of the art boxes
-            int availableSpace = artworkLeft; // artworkLeft is already the distance between Game List and art boxes
-
-            // Center the columns by calculating the unused space
+            int availableSpace = artworkLeft;
             int unusedSpace = availableSpace - totalColumnsWidth;
-            int column1Left = unusedSpace / 2; // Center the columns
+            int column1Left = unusedSpace / 2;
 
             column2Left = column1Left + labelWidth + columnGap;
             column3Left = column2Left + inputWidth + columnGap;
 
-            // Log the centering calculation for debugging
             Logger.LogToFile($"SetupGameView Centering: GameListWidth={gameList.Width}, ArtworkLeft={artworkLeft}, AvailableSpace={availableSpace}, TotalColumnsWidth={totalColumnsWidth}, UnusedSpace={unusedSpace}, Column1Left={column1Left}");
 
-            // Display Name
             var displayNameLabel = new Label { Text = "Display Name", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) };
-            var displayNameTextBox = new CustomTextBox { Text = game?.DisplayName ?? "", Top = currentTop, Left = column2Left, Width = inputWidth, Height = inputHeight, Font = largeFont, Name = "displayNameTextBox" }; // Use CustomTextBox
-            currentTop += sectionGap + inputHeight; // Adjust gap to 18 pixels
+            var displayNameTextBox = new CustomTextBox { Text = game?.DisplayName ?? "", Top = currentTop, Left = column2Left, Width = inputWidth, Height = inputHeight, Font = largeFont, Name = "displayNameTextBox" };
+            currentTop += sectionGap + inputHeight;
 
-            // Alphabetizing Name
             var alphabetizeNameLabel = new Label { Text = "Alphabetizing Name", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) };
-            var alphabetizeNameTextBox = new CustomTextBox { Text = game?.AlphabetizeName ?? "", Top = currentTop, Left = column2Left, Width = inputWidth, Height = inputHeight, Font = largeFont, Name = "alphabetizeNameTextBox" }; // Use CustomTextBox
-            currentTop += sectionGap + inputHeight; // Adjust gap to 18 pixels
+            var alphabetizeNameTextBox = new CustomTextBox { Text = game?.AlphabetizeName ?? "", Top = currentTop, Left = column2Left, Width = inputWidth, Height = inputHeight, Font = largeFont, Name = "alphabetizeNameTextBox" };
+            currentTop += sectionGap + inputHeight;
 
-            // Game Type
             var gameTypeLabel = new Label { Text = "Game Type", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) };
             var gameTypeComboBox = new CustomComboBox
             {
@@ -230,12 +218,11 @@ namespace ArcadeLauncher.SW2
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Name = "gameTypeComboBox",
                 Font = largeFont
-            }; // Use CustomComboBox
+            };
             gameTypeComboBox.Items.Add("PC");
             gameTypeComboBox.Items.AddRange(plugins.Select(p => p.Name).ToArray());
             gameTypeComboBox.SelectedItem = game?.Type ?? "PC";
 
-            // Define event handlers for gameTypeComboBox
             EventHandler comboBoxGotFocus = (s, e) =>
             {
                 Logger.LogToFile("Game Type ComboBox received focus.");
@@ -253,7 +240,7 @@ namespace ArcadeLauncher.SW2
             {
                 if (gameList.SelectedItem != game && gameList.Items.Contains(game))
                 {
-                    gameList.SelectedItem = game; // Restore the selected game
+                    gameList.SelectedItem = game;
                 }
                 gameList.SelectedIndexChanged += selectedIndexChangedHandler;
                 Logger.LogToFile("Resubscribed to gameList.SelectedIndexChanged after combo box closed.");
@@ -267,7 +254,6 @@ namespace ArcadeLauncher.SW2
                 }
             };
 
-            // Subscribe to events for gameList and gameTypeComboBox
             gameList.GotFocus += gameListGotFocus;
             gameList.LostFocus += gameListLostFocus;
             gameTypeComboBox.GotFocus += comboBoxGotFocus;
@@ -276,31 +262,52 @@ namespace ArcadeLauncher.SW2
             gameTypeComboBox.DropDownClosed += comboBoxDropDownClosed;
             gameTypeComboBox.SelectedIndexChanged += comboBoxSelectedIndexChanged;
 
-            currentTop += sectionGap + inputHeight; // Adjust gap to 18 pixels
+            currentTop += sectionGap + inputHeight;
 
-            // Executable Path
             var executablePathLabel = new Label { Text = "Executable Path", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) };
-            var executableTextBox = new CustomTextBox { Text = game?.ExecutablePath ?? "", Top = currentTop, Left = column2Left, Width = inputWidth, Height = inputHeight, Font = largeFont, Name = "executableTextBox" }; // Use CustomTextBox
-            var executableButton = new CustomButton { Text = "Browse", Top = currentTop, Left = column3Left, Width = buttonWidth, Height = buttonHeight, Font = largeFont }; // Use CustomButton
-            currentTop += sectionGap + inputHeight; // Adjust gap to 18 pixels
+            var executableTextBox = new CustomTextBox { Text = game?.ExecutablePath ?? "", Top = currentTop, Left = column2Left, Width = inputWidth, Height = inputHeight, Font = largeFont, Name = "executableTextBox" };
+            var executableButton = new CustomButton { Text = "Browse", Top = currentTop, Left = column3Left, Width = buttonWidth, Height = buttonHeight, Font = largeFont };
+            currentTop += sectionGap + inputHeight;
 
-            // LEDBlinky Animation
             var ledBlinkyLabel = new Label { Text = "LEDBlinky Animation", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) };
-            var ledBlinkyTextBox = new CustomTextBox { Text = game?.LEDBlinkyCommand ?? "", Top = currentTop, Left = column2Left, Width = inputWidth, Height = inputHeight, Font = largeFont, Name = "ledBlinkyTextBox" }; // Use CustomTextBox
-            currentTop += sectionGap + inputHeight; // Adjust gap to 18 pixels
+            var ledBlinkyTextBox = new CustomTextBox { Text = game?.LEDBlinkyCommand ?? "", Top = currentTop, Left = column2Left, Width = inputWidth, Height = inputHeight, Font = largeFont, Name = "ledBlinkyTextBox" };
+            currentTop += sectionGap + inputHeight;
 
-            // Pre-Launch Commands
+            // Splash Screen Duration (moved between LEDBlinky and Pre-Launch)
+            var splashDurationLabel = new Label
+            {
+                Text = "Splash Duration (s)",
+                Top = currentTop,
+                Left = column1Left,
+                Width = labelWidth,
+                Height = labelHeight,
+                Font = largeFont,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(0)
+            };
+            var splashDurationTextBox = new CustomTextBox
+            {
+                Top = currentTop,
+                Left = column2Left,
+                Width = inputWidth,
+                Height = inputHeight,
+                Font = largeFont,
+                Text = game?.SplashDuration.ToString() ?? "3",
+                Name = "splashDurationTextBox"
+            };
+            currentTop += inputHeight + sectionGap;
+
             var preLaunchLabel = new Label { Text = "Pre-Launch Commands", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) };
             preLaunchCommandsList = new List<TextBox>();
             preLaunchMinusButtons = new List<Button>();
             preLaunchPlusButtons = new List<Button>();
             int preLaunchCount = game?.PreLaunchCommands?.Count > 0 ? game.PreLaunchCommands.Count : 1;
             Logger.LogToFile($"Loading Pre-Launch Commands: Count={preLaunchCount}, Commands=[{string.Join(", ", game?.PreLaunchCommands ?? new List<string>())}]");
-            preLaunchFirstInputTop = currentTop; // Align first command with the label
+            preLaunchFirstInputTop = currentTop;
             currentTop = preLaunchFirstInputTop;
             for (int i = 0; i < preLaunchCount; i++)
             {
-                var commandTextBox = new CustomTextBox // Use CustomTextBox
+                var commandTextBox = new CustomTextBox
                 {
                     Top = currentTop,
                     Left = column2Left,
@@ -309,10 +316,10 @@ namespace ArcadeLauncher.SW2
                     Font = largeFont,
                     Text = game?.PreLaunchCommands?.Count > i ? game.PreLaunchCommands[i] : "",
                     Visible = true,
-                    Tag = "PreLaunch" // Tag to identify Pre-Launch commands
+                    Tag = "PreLaunch"
                 };
-                var minusButton = new CustomButton { Text = "−", Top = currentTop, Left = column3Left, Width = smallButtonWidth, Height = smallButtonHeight, Font = largeFont, Visible = true }; // Use CustomButton
-                var plusButton = new CustomButton { Text = "+", Top = currentTop, Left = column3Left + smallButtonWidth + smallButtonGap, Width = smallButtonWidth, Height = smallButtonHeight, Font = largeFont, Visible = true }; // Use CustomButton
+                var minusButton = new CustomButton { Text = "−", Top = currentTop, Left = column3Left, Width = smallButtonWidth, Height = smallButtonHeight, Font = largeFont, Visible = true };
+                var plusButton = new CustomButton { Text = "+", Top = currentTop, Left = column3Left + smallButtonWidth + smallButtonGap, Width = smallButtonWidth, Height = smallButtonHeight, Font = largeFont, Visible = true };
                 preLaunchCommandsList.Add(commandTextBox);
                 preLaunchMinusButtons.Add(minusButton);
                 preLaunchPlusButtons.Add(plusButton);
@@ -320,26 +327,24 @@ namespace ArcadeLauncher.SW2
                 mainPanel.Controls.Add(minusButton);
                 mainPanel.Controls.Add(plusButton);
                 Logger.LogToFile($"Pre-Launch Command {i + 1}: Text='{commandTextBox.Text}', Top={commandTextBox.Top}");
-                currentTop += inputHeight; // Use inputHeight for all commands to butt them up
+                currentTop += inputHeight;
             }
 
-            // Calculate the desired Top position for the Post-Close label to achieve an 18-pixel gap
             int lastPreLaunchTop = preLaunchCommandsList.Last().Top;
-            int desiredPostCloseTop = lastPreLaunchTop + inputHeight + sectionGap; // Last Pre-Launch Top + inputHeight + desired gap
+            int desiredPostCloseTop = lastPreLaunchTop + inputHeight + sectionGap;
 
-            // Post-Close Commands
-            currentTop = desiredPostCloseTop; // Set currentTop to achieve the 18-pixel gap
+            currentTop = desiredPostCloseTop;
             postCloseLabel = new Label { Text = "Post-Close Commands", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) };
             postCloseCommandsList = new List<TextBox>();
             postCloseMinusButtons = new List<Button>();
             postClosePlusButtons = new List<Button>();
             int postCloseCount = game?.PostExitCommands?.Count > 0 ? game.PostExitCommands.Count : 1;
             Logger.LogToFile($"Loading Post-Close Commands: Count={postCloseCount}, Commands=[{string.Join(", ", game?.PostExitCommands ?? new List<string>())}]");
-            postCloseFirstInputTop = currentTop; // Align first command with the label
+            postCloseFirstInputTop = currentTop;
             currentTop = postCloseFirstInputTop;
             for (int i = 0; i < postCloseCount; i++)
             {
-                var commandTextBox = new CustomTextBox // Use CustomTextBox
+                var commandTextBox = new CustomTextBox
                 {
                     Top = currentTop,
                     Left = column2Left,
@@ -348,10 +353,10 @@ namespace ArcadeLauncher.SW2
                     Font = largeFont,
                     Text = game?.PostExitCommands?.Count > i ? game.PostExitCommands[i] : "",
                     Visible = true,
-                    Tag = "PostClose" // Tag to identify Post-Close commands
+                    Tag = "PostClose"
                 };
-                var minusButton = new CustomButton { Text = "−", Top = currentTop, Left = column3Left, Width = smallButtonWidth, Height = smallButtonHeight, Font = largeFont, Visible = true }; // Use CustomButton
-                var plusButton = new CustomButton { Text = "+", Top = currentTop, Left = column3Left + smallButtonWidth + smallButtonGap, Width = smallButtonWidth, Height = smallButtonHeight, Font = largeFont, Visible = true }; // Use CustomButton
+                var minusButton = new CustomButton { Text = "−", Top = currentTop, Left = column3Left, Width = smallButtonWidth, Height = smallButtonHeight, Font = largeFont, Visible = true };
+                var plusButton = new CustomButton { Text = "+", Top = currentTop, Left = column3Left + smallButtonWidth + smallButtonGap, Width = smallButtonWidth, Height = smallButtonHeight, Font = largeFont, Visible = true };
                 postCloseCommandsList.Add(commandTextBox);
                 postCloseMinusButtons.Add(minusButton);
                 postClosePlusButtons.Add(plusButton);
@@ -359,28 +364,26 @@ namespace ArcadeLauncher.SW2
                 mainPanel.Controls.Add(minusButton);
                 mainPanel.Controls.Add(plusButton);
                 Logger.LogToFile($"Post-Close Command {i + 1}: Text='{commandTextBox.Text}', Top={commandTextBox.Top}");
-                currentTop += inputHeight; // Use inputHeight for all commands to butt them up
+                currentTop += inputHeight;
             }
 
-            // Notes Section (Feature 3)
-            currentTop += sectionGap; // Add gap after Post-Close Commands
-            notesLabel = new Label { Text = "Notes", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) }; // Assign to class-level field
+            currentTop += sectionGap;
+            notesLabel = new Label { Text = "Notes", Top = currentTop, Left = column1Left, Width = labelWidth, Height = labelHeight, Font = largeFont, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0) };
             notesTextBox = new CustomTextBox
             {
                 Top = currentTop,
                 Left = column2Left,
                 Width = inputWidth,
-                Height = inputHeight * 3, // 3 lines tall for multiline input
+                Height = inputHeight * 3,
                 Font = largeFont,
                 Multiline = true,
                 AcceptsReturn = true,
                 ScrollBars = ScrollBars.Vertical,
-                Text = game?.Notes ?? "", // Load existing notes if any
+                Text = game?.Notes ?? "",
                 Name = "notesTextBox"
             };
-            currentTop += notesTextBox.Height + sectionGap; // Adjust for the taller TextBox
+            currentTop += notesTextBox.Height + sectionGap;
 
-            // In Progress Checkbox (below Notes, above Hide Mouse Cursor)
             var inProgressLabel = new Label
             {
                 Text = "In Progress",
@@ -398,12 +401,11 @@ namespace ArcadeLauncher.SW2
                 Left = column2Left,
                 Width = inputWidth,
                 Height = inputHeight,
-                Checked = isNewGame ? true : (game?.IsInProgress ?? false), // Default to checked for new games
+                Checked = isNewGame ? true : (game?.IsInProgress ?? false),
                 Name = "inProgressCheckBox"
             };
-            currentTop += inputHeight + sectionGap; // Adjust for the checkbox height
+            currentTop += inputHeight + sectionGap;
 
-            // Hide Mouse Cursor Checkbox (below In Progress, above Save/Cancel buttons)
             var hideMouseCursorLabel = new Label
             {
                 Text = "Hide Mouse Cursor",
@@ -421,24 +423,21 @@ namespace ArcadeLauncher.SW2
                 Left = column2Left,
                 Width = inputWidth,
                 Height = inputHeight,
-                Checked = game?.HideMouseCursor ?? false, // Default to unchecked unless specified
+                Checked = game?.HideMouseCursor ?? false,
                 Name = "hideMouseCursorCheckBox"
             };
-            currentTop += inputHeight + sectionGap; // Adjust for the checkbox height
+            currentTop += inputHeight + sectionGap;
 
-            // Save and Cancel Buttons (moved down to accommodate new Hide Mouse Cursor section)
-            saveButton = new CustomButton { Text = "Save Game", Top = currentTop, Left = column1Left, Width = saveCancelButtonWidth, Height = saveCancelButtonHeight, Font = largeFont }; // Use CustomButton
-            cancelButton = new CustomButton { Text = "Cancel", Top = currentTop, Left = column1Left + saveCancelButtonWidth + columnGap, Width = saveCancelButtonWidth, Height = saveCancelButtonHeight, Font = largeFont }; // Use CustomButton
+            saveButton = new CustomButton { Text = "Save Game", Top = currentTop, Left = column1Left, Width = saveCancelButtonWidth, Height = saveCancelButtonHeight, Font = largeFont };
+            cancelButton = new CustomButton { Text = "Cancel", Top = currentTop, Left = column1Left + saveCancelButtonWidth + columnGap, Width = saveCancelButtonWidth, Height = saveCancelButtonHeight, Font = largeFont };
             currentTop += sectionGap + inputHeight;
 
-            // Restore the selected game and resubscribe to the event
             if (gameList.SelectedItem != game && gameList.Items.Contains(game))
             {
-                gameList.SelectedItem = game; // Restore the selected game
+                gameList.SelectedItem = game;
             }
             gameList.SelectedIndexChanged += selectedIndexChangedHandler;
 
-            // Auto-match Alphabetize Name to Display Name (Ticket 03)
             bool shouldSyncNames = string.IsNullOrEmpty(alphabetizeNameTextBox.Text);
             displayNameTextBox.TextChanged += (s, e) =>
             {
@@ -455,11 +454,9 @@ namespace ArcadeLauncher.SW2
                 }
             };
 
-            // Assign initial event handlers for Pre-Launch and Post-Close commands
             ReassignPreLaunchButtons();
             ReassignPostCloseButtons();
 
-            // Artwork context menus with Remove Artwork option (Ticket 19)
             artBoxPictureBox.Click += (s, e) =>
             {
                 var contextMenu = new ContextMenuStrip();
@@ -539,33 +536,45 @@ namespace ArcadeLauncher.SW2
                 contextMenu.Show(marqueePictureBox, marqueePictureBox.PointToClient(Cursor.Position));
             };
 
-            controllerPictureBox.Click += (s, e) =>
+            splashScreenPictureBox.Click += (s, e) =>
             {
                 var contextMenu = new ContextMenuStrip();
-                contextMenu.Items.Add("Select File", null, (sender, args) => SelectImage(controllerPictureBox, "ControllerLayout", game));
-                if (controllerPictureBox.Image != null)
+                contextMenu.Items.Add("Search Online", null, async (sender, args) =>
+                {
+                    if (string.IsNullOrEmpty(displayNameTextBox.Text))
+                    {
+                        MessageBox.Show("Please enter a display name to search for a splash screen image.");
+                        return;
+                    }
+                    await SearchCoverArt(displayNameTextBox.Text, splashScreenPictureBox, game, "SplashScreen");
+                });
+                contextMenu.Items.Add("Select File", null, (sender, args) => SelectImage(splashScreenPictureBox, "SplashScreen", game));
+                if (splashScreenPictureBox.Image != null)
                 {
                     contextMenu.Items.Add("Remove Artwork", null, (sender, args) =>
                     {
-                        if (File.Exists(game.ControllerLayoutPath))
+                        foreach (var path in game.SplashScreenPath.Values)
                         {
-                            try
+                            if (File.Exists(path))
                             {
-                                File.Delete(game.ControllerLayoutPath);
-                                Logger.LogToFile($"Removed artwork file: {game.ControllerLayoutPath}");
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.LogToFile($"Failed to remove artwork file {game.ControllerLayoutPath}: {ex.Message}");
+                                try
+                                {
+                                    File.Delete(path);
+                                    Logger.LogToFile($"Removed splash screen file: {path}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.LogToFile($"Failed to remove splash screen file {path}: {ex.Message}");
+                                }
                             }
                         }
-                        controllerPictureBox.Image?.Dispose();
-                        controllerPictureBox.Image = null;
-                        game.ControllerLayoutPath = "";
-                        Logger.LogToFile("Cleared ControllerLayoutPath for game.");
+                        splashScreenPictureBox.Image?.Dispose();
+                        splashScreenPictureBox.Image = null;
+                        game.SplashScreenPath.Clear();
+                        Logger.LogToFile("Cleared SplashScreenPath for game.");
                     });
                 }
-                contextMenu.Show(controllerPictureBox, controllerPictureBox.PointToClient(Cursor.Position));
+                contextMenu.Show(splashScreenPictureBox, splashScreenPictureBox.PointToClient(Cursor.Position));
             };
 
             executableButton.Click += (s, e) =>
@@ -584,6 +593,46 @@ namespace ArcadeLauncher.SW2
             {
                 if (mainPanel.Tag is Game gameToSave)
                 {
+                    gameToSave.DisplayName = mainPanel.Controls.Find("displayNameTextBox", true).FirstOrDefault()?.Text ?? "";
+                    gameToSave.AlphabetizeName = mainPanel.Controls.Find("alphabetizeNameTextBox", true).FirstOrDefault()?.Text ?? "";
+                    gameToSave.Type = (mainPanel.Controls.Find("gameTypeComboBox", true).FirstOrDefault() as ComboBox)?.SelectedItem?.ToString() ?? "PC";
+                    gameToSave.ExecutablePath = mainPanel.Controls.Find("executableTextBox", true).FirstOrDefault()?.Text ?? "";
+                    gameToSave.LEDBlinkyCommand = mainPanel.Controls.Find("ledBlinkyTextBox", true).FirstOrDefault()?.Text ?? "";
+                    gameToSave.Notes = mainPanel.Controls.Find("notesTextBox", true).FirstOrDefault()?.Text ?? "";
+                    gameToSave.IsInProgress = (mainPanel.Controls.Find("inProgressCheckBox", true).FirstOrDefault() as CheckBox)?.Checked ?? false;
+                    gameToSave.HideMouseCursor = (mainPanel.Controls.Find("hideMouseCursorCheckBox", true).FirstOrDefault() as CheckBox)?.Checked ?? false;
+
+                    if (int.TryParse(splashDurationTextBox.Text, out int splashDuration))
+                    {
+                        gameToSave.SplashDuration = Math.Max(2, Math.Min(10, splashDuration));
+                    }
+                    else
+                    {
+                        gameToSave.SplashDuration = 3;
+                    }
+
+                    gameToSave.PreLaunchCommands.Clear();
+                    var preLaunchTextBoxes = mainPanel.Controls.OfType<TextBox>().Where(tb => tb.Tag?.ToString() == "PreLaunch" && tb.Visible).OrderBy(tb => tb.Top).ToList();
+                    for (int i = 0; i < preLaunchTextBoxes.Count; i++)
+                    {
+                        var command = preLaunchTextBoxes[i].Text.Trim();
+                        if (!string.IsNullOrEmpty(command))
+                        {
+                            gameToSave.PreLaunchCommands.Add(command);
+                        }
+                    }
+
+                    gameToSave.PostExitCommands.Clear();
+                    var postCloseTextBoxes = mainPanel.Controls.OfType<TextBox>().Where(tb => tb.Tag?.ToString() == "PostClose" && tb.Visible).OrderBy(tb => tb.Top).ToList();
+                    for (int i = 0; i < postCloseTextBoxes.Count; i++)
+                    {
+                        var command = postCloseTextBoxes[i].Text.Trim();
+                        if (!string.IsNullOrEmpty(command))
+                        {
+                            gameToSave.PostExitCommands.Add(command);
+                        }
+                    }
+
                     SaveGame(gameToSave, isNewGame);
                 }
             };
@@ -611,19 +660,21 @@ namespace ArcadeLauncher.SW2
             mainPanel.Controls.Add(executableButton);
             mainPanel.Controls.Add(ledBlinkyLabel);
             mainPanel.Controls.Add(ledBlinkyTextBox);
+            mainPanel.Controls.Add(splashDurationLabel);
+            mainPanel.Controls.Add(splashDurationTextBox);
             mainPanel.Controls.Add(preLaunchLabel);
             mainPanel.Controls.Add(postCloseLabel);
             mainPanel.Controls.Add(notesLabel);
             mainPanel.Controls.Add(notesTextBox);
-            mainPanel.Controls.Add(inProgressLabel); // Add In Progress label
-            mainPanel.Controls.Add(inProgressCheckBox); // Add In Progress checkbox
-            mainPanel.Controls.Add(hideMouseCursorLabel); // Add Hide Mouse Cursor label
-            mainPanel.Controls.Add(hideMouseCursorCheckBox); // Add Hide Mouse Cursor checkbox
+            mainPanel.Controls.Add(inProgressLabel);
+            mainPanel.Controls.Add(inProgressCheckBox);
+            mainPanel.Controls.Add(hideMouseCursorLabel);
+            mainPanel.Controls.Add(hideMouseCursorCheckBox);
             mainPanel.Controls.Add(saveButton);
             mainPanel.Controls.Add(cancelButton);
             mainPanel.Controls.Add(artBoxPictureBox);
             mainPanel.Controls.Add(marqueePictureBox);
-            mainPanel.Controls.Add(controllerPictureBox);
+            mainPanel.Controls.Add(splashScreenPictureBox);
 
             foreach (var control in preLaunchCommandsList)
             {
@@ -651,21 +702,18 @@ namespace ArcadeLauncher.SW2
                 mainPanel.Controls.Add(control);
             }
 
-            mainPanel.ResumeLayout(); // Resume layout updates after all controls are added (Ticket 04)
+            mainPanel.ResumeLayout();
 
-            // Restore mainPanel visibility after layout is complete
             mainPanel.Visible = true;
             Logger.LogToFile("Set mainPanel.Visible = true after SetupGameView completed.");
 
-            // Force focus to a non-interactive control to prevent gameList flicker on first combo box interaction
             displayNameLabel.Focus();
             Logger.LogToFile("Forced focus to displayNameLabel to prevent gameList flicker.");
 
-            // Verify focus state
             if (ActiveControl == gameList)
             {
                 Logger.LogToFile("Warning: gameList regained focus after forcing focus to displayNameLabel.");
-                displayNameLabel.Focus(); // Force focus again if necessary
+                displayNameLabel.Focus();
             }
         }
     }

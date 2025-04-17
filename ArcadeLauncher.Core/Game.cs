@@ -19,8 +19,11 @@ namespace ArcadeLauncher.Core
         public List<string> PostExitCommands { get; set; } = new List<string>();
         public string LEDBlinkyCommand { get; set; } = "";
         public string Notes { get; set; } = "";
-        public bool IsInProgress { get; set; } = false; // Added property with default false
-        public bool HideMouseCursor { get; set; } = false; // Added property with default false
+        public bool IsInProgress { get; set; } = false;
+        public bool HideMouseCursor { get; set; } = false;
+        // New fields for splash screen
+        public Dictionary<string, string> SplashScreenPath { get; set; } = new Dictionary<string, string>(); // e.g., {"4k": path, "1440p": path, "1080p": path}
+        public int SplashDuration { get; set; } = 3; // In seconds, default 3
 
         public override string ToString()
         {
