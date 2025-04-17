@@ -98,6 +98,9 @@
     <Compile Include="MainForm.Core.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="MainForm.CoverArt.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="MainForm.Designer.cs">
       <DependentUpon>MainForm.Core.cs</DependentUpon>
     </Compile>
@@ -110,7 +113,7 @@
     <Compile Include="MainForm.MainUI.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="MainForm.SettingsAndCoverArt.cs">
+    <Compile Include="MainForm.Settings.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Program.cs" />
