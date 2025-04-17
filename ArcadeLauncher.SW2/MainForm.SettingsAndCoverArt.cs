@@ -393,11 +393,11 @@ namespace ArcadeLauncher.SW2
                 string requestBody;
                 if (assetType == "SplashScreen")
                 {
-                    requestBody = $"fields name,screenshots.url; search \"{gameName}\"; limit 50;";
+                    requestBody = $"fields name,screenshots.url,artworks.url; search \"{gameName}\"; limit 40;";
                 }
                 else
                 {
-                    requestBody = $"fields name,cover.url; search \"{gameName}\"; limit 50;";
+                    requestBody = $"fields name,cover.url; search \"{gameName}\"; limit 40;";
                 }
 
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
@@ -422,7 +422,7 @@ namespace ArcadeLauncher.SW2
                 {
                     if (assetType == "SplashScreen")
                     {
-                        Logger.LogToFile($"Game: {g.Name}, Screenshot URLs: {(g.Screenshots != null ? string.Join(", ", g.Screenshots.Select(s => s.Url)) : "null")}");
+                        Logger.LogToFile($"Game: {g.Name}, Artwork URLs: {(g.Artworks != null ? string.Join(", ", g.Artworks.Select(a => a.Url)) : "null")}, Screenshot URLs: {(g.Screenshots != null ? string.Join(", ", g.Screenshots.Select(s => s.Url)) : "null")}");
                     }
                     else
                     {
@@ -439,7 +439,8 @@ namespace ArcadeLauncher.SW2
                         Logger.LogToFile("CoverArtSelectionForm lost focus. Closing form.");
                         coverArtForm.Close();
                     };
-                    coverArtForm.Show();
+                    // Load images and show the form
+                    await coverArtForm.LoadAndShowAsync();
 
                     var selectedCoverUrl = await tcs.Task;
 
@@ -560,10 +561,10 @@ namespace ArcadeLauncher.SW2
                                 // 4K (3840x2160) - Always generate, even if source is smaller
                                 var destPath4k = Path.Combine(gameDir, "SplashScreen_4k.png");
                                 using (var resizedImage = new Bitmap(3840, 2160))
-                                using (Graphics g = Graphics.FromImage(resizedImage))
+                                using (var graphics4k = Graphics.FromImage(resizedImage))
                                 {
-                                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                    g.DrawImage(sourceImage, 0, 0, 3840, 2160);
+                                    graphics4k.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                    graphics4k.DrawImage(sourceImage, 0, 0, 3840, 2160);
                                     resizedImage.Save(destPath4k, System.Drawing.Imaging.ImageFormat.Png);
                                     Logger.LogToFile($"Saved 4K splash screen image to: {destPath4k} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                                 }
@@ -577,10 +578,10 @@ namespace ArcadeLauncher.SW2
                                 // 1440p (2560x1440)
                                 var destPath1440p = Path.Combine(gameDir, "SplashScreen_1440p.png");
                                 using (var resizedImage = new Bitmap(2560, 1440))
-                                using (Graphics g = Graphics.FromImage(resizedImage))
+                                using (var graphics1440p = Graphics.FromImage(resizedImage))
                                 {
-                                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                    g.DrawImage(sourceImage, 0, 0, 2560, 1440);
+                                    graphics1440p.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                    graphics1440p.DrawImage(sourceImage, 0, 0, 2560, 1440);
                                     resizedImage.Save(destPath1440p, System.Drawing.Imaging.ImageFormat.Png);
                                     Logger.LogToFile($"Saved 1440p splash screen image to: {destPath1440p} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                                 }
@@ -590,10 +591,10 @@ namespace ArcadeLauncher.SW2
                                 // 1080p (1920x1080)
                                 var destPath1080p = Path.Combine(gameDir, "SplashScreen_1080p.png");
                                 using (var resizedImage = new Bitmap(1920, 1080))
-                                using (Graphics g = Graphics.FromImage(resizedImage))
+                                using (var graphics1080p = Graphics.FromImage(resizedImage))
                                 {
-                                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                    g.DrawImage(sourceImage, 0, 0, 1920, 1080);
+                                    graphics1080p.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                    graphics1080p.DrawImage(sourceImage, 0, 0, 1920, 1080);
                                     resizedImage.Save(destPath1080p, System.Drawing.Imaging.ImageFormat.Png);
                                     Logger.LogToFile($"Saved 1080p splash screen image to: {destPath1080p} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                                 }
@@ -645,12 +646,10 @@ namespace ArcadeLauncher.SW2
                                 {
                                     Rectangle cropRect = new Rectangle(0, 0, 1920, 360);
                                     using (var croppedBitmap = new Bitmap(1920, 360))
+                                    using (var graphicsPreview = Graphics.FromImage(croppedBitmap))
                                     {
-                                        using (Graphics g = Graphics.FromImage(croppedBitmap))
-                                        {
-                                            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                            g.DrawImage(sourceImage, new Rectangle(0, 0, 1920, 360), cropRect, GraphicsUnit.Pixel);
-                                        }
+                                        graphicsPreview.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                        graphicsPreview.DrawImage(sourceImage, new Rectangle(0, 0, 1920, 360), cropRect, GraphicsUnit.Pixel);
                                         croppedBitmap.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
                                         Logger.LogToFile($"Saved cropped preview image to: {previewPath} with dimensions: {croppedBitmap.Width}x{croppedBitmap.Height}");
                                     }
@@ -736,10 +735,10 @@ namespace ArcadeLauncher.SW2
 
                             // 4K (3840x2160) - Always generate, even if source is smaller
                             using (var resizedImage = new Bitmap(3840, 2160))
-                            using (Graphics g = Graphics.FromImage(resizedImage))
+                            using (var graphics4k = Graphics.FromImage(resizedImage))
                             {
-                                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                g.DrawImage(sourceImage, 0, 0, 3840, 2160);
+                                graphics4k.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                graphics4k.DrawImage(sourceImage, 0, 0, 3840, 2160);
                                 resizedImage.Save(destPath4k, System.Drawing.Imaging.ImageFormat.Png);
                                 Logger.LogToFile($"Saved 4K splash screen image to: {destPath4k} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                             }
@@ -752,10 +751,10 @@ namespace ArcadeLauncher.SW2
 
                             // 1440p (2560x1440)
                             using (var resizedImage = new Bitmap(2560, 1440))
-                            using (Graphics g = Graphics.FromImage(resizedImage))
+                            using (var graphics1440p = Graphics.FromImage(resizedImage))
                             {
-                                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                g.DrawImage(sourceImage, 0, 0, 2560, 1440);
+                                graphics1440p.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                graphics1440p.DrawImage(sourceImage, 0, 0, 2560, 1440);
                                 resizedImage.Save(destPath1440p, System.Drawing.Imaging.ImageFormat.Png);
                                 Logger.LogToFile($"Saved 1440p splash screen image to: {destPath1440p} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                             }
@@ -764,10 +763,10 @@ namespace ArcadeLauncher.SW2
 
                             // 1080p (1920x1080)
                             using (var resizedImage = new Bitmap(1920, 1080))
-                            using (Graphics g = Graphics.FromImage(resizedImage))
+                            using (var graphics1080p = Graphics.FromImage(resizedImage))
                             {
-                                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                g.DrawImage(sourceImage, 0, 0, 1920, 1080);
+                                graphics1080p.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                graphics1080p.DrawImage(sourceImage, 0, 0, 1920, 1080);
                                 resizedImage.Save(destPath1080p, System.Drawing.Imaging.ImageFormat.Png);
                                 Logger.LogToFile($"Saved 1080p splash screen image to: {destPath1080p} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                             }
@@ -818,12 +817,10 @@ namespace ArcadeLauncher.SW2
                             {
                                 Rectangle cropRect = new Rectangle(0, 0, 1920, 360);
                                 using (var croppedBitmap = new Bitmap(1920, 360))
+                                using (var graphicsPreview = Graphics.FromImage(croppedBitmap))
                                 {
-                                    using (Graphics g = Graphics.FromImage(croppedBitmap))
-                                    {
-                                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                        g.DrawImage(sourceImage, new Rectangle(0, 0, 1920, 360), cropRect, GraphicsUnit.Pixel);
-                                    }
+                                    graphicsPreview.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                                    graphicsPreview.DrawImage(sourceImage, new Rectangle(0, 0, 1920, 360), cropRect, GraphicsUnit.Pixel);
                                     croppedBitmap.Save(previewPath, System.Drawing.Imaging.ImageFormat.Png);
                                     Logger.LogToFile($"Saved cropped preview image to: {previewPath} with dimensions: {croppedBitmap.Width}x{croppedBitmap.Height}");
                                 }
@@ -864,6 +861,7 @@ namespace ArcadeLauncher.SW2
             public string Name { get; set; }
             public IGDBCover Cover { get; set; }
             public List<IGDBScreenshot> Screenshots { get; set; }
+            public List<IGDBScreenshot> Artworks { get; set; }
         }
 
         public class IGDBCover
@@ -883,7 +881,6 @@ namespace ArcadeLauncher.SW2
             private List<PictureBox> pictureBoxes;
             private HttpClient httpClient;
             private FlowLayoutPanel flowLayoutPanel;
-            private Label loadingLabel;
             private string assetType;
             public string SelectedCoverUrl { get; private set; }
 
@@ -899,10 +896,11 @@ namespace ArcadeLauncher.SW2
                 double scalingFactor = (double)Screen.PrimaryScreen.WorkingArea.Height / 1080;
                 Logger.LogToFile($"CoverArtSelectionForm Scaling Factor: scalingFactor={scalingFactor}, ScreenHeight={Screen.PrimaryScreen.WorkingArea.Height}");
 
-                int thumbnailWidth = (int)(333 * scalingFactor); // Increased from 200 to 333 to fit 3 per row
+                int baseThumbnailWidth = assetType == "SplashScreen" ? 333 : 198; // Smaller thumbnails for CoverArt to fit 5 columns in same width as 3 SplashScreen columns
+                int thumbnailWidth = (int)(baseThumbnailWidth * scalingFactor);
                 int thumbnailHeight = (int)(thumbnailWidth * (assetType == "SplashScreen" ? 9.0 / 16.0 : 4.0 / 3.0));
                 int gap = (int)(5 * scalingFactor);
-                int columns = 3; // Target 3 columns
+                int columns = assetType == "SplashScreen" ? 3 : 5; // 3 columns for SplashScreen, 5 for CoverArt
                 int margin = (int)(18 * scalingFactor);
                 int scrollbarWidth = (int)(20 * scalingFactor);
                 int formWidth = (columns * thumbnailWidth) + ((columns - 1) * gap) + (2 * margin) + scrollbarWidth + (int)(10 * scalingFactor) + 25;
@@ -919,16 +917,6 @@ namespace ArcadeLauncher.SW2
                 this.Text = assetType == "SplashScreen" ? "Select Splash Screen Image" : "Select Cover Art";
                 pictureBoxes = new List<PictureBox>();
 
-                loadingLabel = new Label
-                {
-                    Text = "Loading images...",
-                    ForeColor = Color.White,
-                    Dock = DockStyle.Fill,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Font = new Font("Microsoft Sans Serif", (float)(12 * scalingFactor))
-                };
-                this.Controls.Add(loadingLabel);
-
                 flowLayoutPanel = new FlowLayoutPanel
                 {
                     Dock = DockStyle.Fill,
@@ -936,14 +924,20 @@ namespace ArcadeLauncher.SW2
                     Padding = new Padding(margin, margin, margin, margin)
                 };
                 this.Controls.Add(flowLayoutPanel);
-                flowLayoutPanel.Visible = false;
+            }
 
-                this.Load += async (s, e) =>
-                {
-                    await LoadCoverArtImagesAsync(thumbnailWidth, gap);
-                    loadingLabel.Visible = false;
-                    flowLayoutPanel.Visible = true;
-                };
+            public async Task LoadAndShowAsync()
+            {
+                double scalingFactor = (double)Screen.PrimaryScreen.WorkingArea.Height / 1080;
+                int baseThumbnailWidth = assetType == "SplashScreen" ? 333 : 198;
+                int thumbnailWidth = (int)(baseThumbnailWidth * scalingFactor);
+                int gap = (int)(5 * scalingFactor);
+
+                // Load images while the form is hidden
+                await LoadCoverArtImagesAsync(thumbnailWidth, gap);
+
+                // Show the form as a modal dialog after images are loaded
+                ShowDialog();
             }
 
             private async Task LoadCoverArtImagesAsync(int thumbnailWidth, int gap)
@@ -952,91 +946,98 @@ namespace ArcadeLauncher.SW2
                 IEnumerable<IGDBGame> filteredGames;
                 if (assetType == "SplashScreen")
                 {
-                    filteredGames = games.Where(g => g.Screenshots != null && g.Screenshots.Any(s => !string.IsNullOrEmpty(s.Url)));
+                    filteredGames = games.Where(g => (g.Artworks != null && g.Artworks.Any(a => !string.IsNullOrEmpty(a.Url))) || (g.Screenshots != null && g.Screenshots.Any(s => !string.IsNullOrEmpty(s.Url))));
                 }
                 else
                 {
                     filteredGames = games.Where(g => g.Cover != null && !string.IsNullOrEmpty(g.Cover.Url));
                 }
 
-                foreach (var game in filteredGames)
+                var imageTasks = new List<Task<(IGDBGame game, string coverUrl, byte[] imageBytes, string imageType)>>();
+                int totalImages = 0;
+                const int maxImages = 60;
+
+                // First, load artworks for SplashScreen
+                if (assetType == "SplashScreen")
                 {
-                    if (assetType == "SplashScreen")
+                    foreach (var game in filteredGames)
                     {
-                        foreach (var screenshot in game.Screenshots)
+                        if (game.Artworks != null)
                         {
-                            try
+                            foreach (var artwork in game.Artworks)
                             {
-                                Logger.LogToFile($"Processing game: {game.Name}, Screenshot URL: {screenshot.Url}");
-                                var coverUrl = screenshot.Url.Replace("t_thumb", "t_1080p");
-                                Logger.LogToFile($"Fetching thumbnail image from: {coverUrl}");
-                                var imageBytes = await httpClient.GetByteArrayAsync($"https:{coverUrl}");
-                                Logger.LogToFile($"Successfully fetched thumbnail image for {game.Name}, size: {imageBytes.Length} bytes");
-
-                                using (var ms = new MemoryStream(imageBytes))
-                                using (var tempImage = Image.FromStream(ms))
+                                if (totalImages >= maxImages) break;
+                                if (!string.IsNullOrEmpty(artwork.Url))
                                 {
-                                    Logger.LogToFile($"Thumbnail image dimensions: {tempImage.Width}x{tempImage.Height}");
-                                    if (tempImage.Width < 1920 || tempImage.Height < 1080)
-                                    {
-                                        Logger.LogToFile($"Warning: Thumbnail image is lower resolution than expected (1920x1080).");
-                                    }
-
-                                    var pictureBox = new PictureBox
-                                    {
-                                        Size = new Size(thumbnailWidth, (int)(thumbnailWidth * 9.0 / 16.0)),
-                                        SizeMode = PictureBoxSizeMode.Zoom, // Use Zoom to maintain aspect ratio without stretching
-                                        Image = new Bitmap(tempImage), // Create a new Bitmap to avoid holding the stream
-                                        BorderStyle = BorderStyle.FixedSingle,
-                                        BackColor = Color.Black,
-                                        Margin = new Padding(gap / 2)
-                                    };
-
-                                    // Custom paint event for high-quality rendering
-                                    pictureBox.Paint += (s, e) =>
-                                    {
-                                        e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                                        e.Graphics.DrawImage(pictureBox.Image, pictureBox.ClientRectangle);
-                                    };
-
-                                    pictureBox.Click += (s, e) =>
-                                    {
-                                        SelectedCoverUrl = screenshot.Url;
-                                        Logger.LogToFile($"Selected splash screen image for {game.Name}: {SelectedCoverUrl}");
-                                        // Hide the form immediately for a smoother close
-                                        this.Visible = false;
-                                        this.Close();
-                                    };
-                                    pictureBoxes.Add(pictureBox);
-                                    flowLayoutPanel.Controls.Add(pictureBox);
-                                    Logger.LogToFile($"Added picture box for {game.Name} (screenshot)");
+                                    imageTasks.Add(FetchImageAsync(game, artwork.Url, "t_screenshot_big", "artwork"));
+                                    totalImages++;
                                 }
                             }
-                            catch (Exception ex)
+                        }
+                        if (totalImages >= maxImages) break;
+                    }
+
+                    // If we haven't reached the limit, fill with screenshots
+                    if (totalImages < maxImages)
+                    {
+                        foreach (var game in filteredGames)
+                        {
+                            if (game.Screenshots != null)
                             {
-                                Logger.LogToFile($"Failed to load splash screen thumbnail for {game.Name}: {ex.Message}");
+                                foreach (var screenshot in game.Screenshots)
+                                {
+                                    if (totalImages >= maxImages) break;
+                                    if (!string.IsNullOrEmpty(screenshot.Url))
+                                    {
+                                        imageTasks.Add(FetchImageAsync(game, screenshot.Url, "t_screenshot_big", "screenshot"));
+                                        totalImages++;
+                                    }
+                                }
                             }
+                            if (totalImages >= maxImages) break;
                         }
                     }
-                    else
+                }
+                else
+                {
+                    // For CoverArt, load covers as before
+                    foreach (var game in filteredGames)
                     {
+                        imageTasks.Add(FetchImageAsync(game, game.Cover.Url, "t_cover_big", "cover"));
+                    }
+                }
+
+                // Process images in batches of 20 to avoid overwhelming the network
+                const int batchSize = 20;
+
+                // Suspend layout to prevent incremental rendering
+                flowLayoutPanel.SuspendLayout();
+
+                for (int i = 0; i < imageTasks.Count; i += batchSize)
+                {
+                    var batch = imageTasks.Skip(i).Take(batchSize).ToList();
+                    var results = await Task.WhenAll(batch);
+
+                    foreach (var (game, coverUrl, imageBytes, imageType) in results)
+                    {
+                        if (imageBytes == null) continue; // Skip failed downloads
+
                         try
                         {
-                            Logger.LogToFile($"Processing game: {game.Name}, Cover URL: {game.Cover.Url}");
-                            var coverUrl = game.Cover.Url.Replace("t_thumb", "t_cover_big");
-                            Logger.LogToFile($"Fetching thumbnail image from: {coverUrl}");
-                            var imageBytes = await httpClient.GetByteArrayAsync($"https:{coverUrl}");
-                            Logger.LogToFile($"Successfully fetched thumbnail image for {game.Name}, size: {imageBytes.Length} bytes");
-
                             using (var ms = new MemoryStream(imageBytes))
                             using (var tempImage = Image.FromStream(ms))
                             {
                                 Logger.LogToFile($"Thumbnail image dimensions: {tempImage.Width}x{tempImage.Height}");
+                                if (tempImage.Width < 1920 || tempImage.Height < 1080)
+                                {
+                                    Logger.LogToFile($"Warning: Thumbnail image is lower resolution than expected (1920x1080).");
+                                }
+
                                 var pictureBox = new PictureBox
                                 {
-                                    Size = new Size(thumbnailWidth, (int)(thumbnailWidth * 4.0 / 3.0)),
+                                    Size = new Size(thumbnailWidth, (int)(thumbnailWidth * (assetType == "SplashScreen" ? 9.0 / 16.0 : 4.0 / 3.0))),
                                     SizeMode = PictureBoxSizeMode.Zoom,
-                                    Image = new Bitmap(tempImage),
+                                    Image = new Bitmap(tempImage), // Set the image immediately
                                     BorderStyle = BorderStyle.FixedSingle,
                                     BackColor = Color.Black,
                                     Margin = new Padding(gap / 2)
@@ -1050,22 +1051,25 @@ namespace ArcadeLauncher.SW2
 
                                 pictureBox.Click += (s, e) =>
                                 {
-                                    SelectedCoverUrl = game.Cover.Url;
-                                    Logger.LogToFile($"Selected cover art for {game.Name}: {SelectedCoverUrl}");
-                                    this.Visible = false;
+                                    SelectedCoverUrl = coverUrl;
+                                    Logger.LogToFile($"Selected {(assetType == "SplashScreen" ? "splash screen" : "cover art")} image for {game.Name}: {SelectedCoverUrl}");
                                     this.Close();
                                 };
+
                                 pictureBoxes.Add(pictureBox);
                                 flowLayoutPanel.Controls.Add(pictureBox);
-                                Logger.LogToFile($"Added picture box for {game.Name}");
+                                Logger.LogToFile($"Added picture box for {game.Name} ({imageType})");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Logger.LogToFile($"Failed to load cover art thumbnail for {game.Name}: {ex.Message}");
+                            Logger.LogToFile($"Failed to load {(assetType == "SplashScreen" ? "splash screen" : "cover art")} thumbnail for {game.Name}: {ex.Message}");
                         }
                     }
                 }
+
+                // Resume layout after all controls are added
+                flowLayoutPanel.ResumeLayout(true);
 
                 Logger.LogToFile($"Finished loading images. Total images loaded: {pictureBoxes.Count}");
                 if (pictureBoxes.Count == 0)
@@ -1073,6 +1077,24 @@ namespace ArcadeLauncher.SW2
                     Logger.LogToFile("No images were loaded. Closing form.");
                     MessageBox.Show("No images could be loaded.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     this.Close();
+                }
+            }
+
+            private async Task<(IGDBGame game, string coverUrl, byte[] imageBytes, string imageType)> FetchImageAsync(IGDBGame game, string coverUrl, string size, string imageType)
+            {
+                try
+                {
+                    Logger.LogToFile($"Processing game: {game.Name}, {(imageType == "artwork" ? "Artwork" : imageType == "screenshot" ? "Screenshot" : "Cover")} URL: {coverUrl}");
+                    var highResUrl = coverUrl.Replace("t_thumb", size);
+                    Logger.LogToFile($"Fetching thumbnail image from: {highResUrl}");
+                    var imageBytes = await httpClient.GetByteArrayAsync($"https:{highResUrl}");
+                    Logger.LogToFile($"Successfully fetched thumbnail image for {game.Name}, size: {imageBytes.Length} bytes");
+                    return (game, coverUrl, imageBytes, imageType);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogToFile($"Failed to load {(assetType == "SplashScreen" ? "splash screen" : "cover art")} thumbnail for {game.Name}: {ex.Message}");
+                    return (game, coverUrl, null, imageType);
                 }
             }
 
