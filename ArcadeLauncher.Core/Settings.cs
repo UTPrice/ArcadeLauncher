@@ -8,6 +8,7 @@ namespace ArcadeLauncher.Core
         public string DefaultMarqueeImage { get; set; } = "";
         public string DefaultControllerImage { get; set; } = "";
         public Dictionary<string, List<string>> InputMappings { get; set; }
+        public double FadeDuration { get; set; } = 0.5; // Default to 0.75 seconds
 
         public Settings()
         {
@@ -24,6 +25,7 @@ namespace ArcadeLauncher.Core
                 { "Exit", new List<string> { "Escape" } },
                 { "Kill", new List<string>() } // New Kill Switch mapping, empty by default
             };
+            FadeDuration = 0.75; // Initialize default fade duration
         }
     }
 }

@@ -256,6 +256,32 @@ namespace ArcadeLauncher.SW2
 
             var saveSettingsButton = new Button { Text = "Save Settings", Top = currentTop, Left = column1Left, Width = buttonWidth, Height = buttonHeight, Font = largeFont };
             var cancelSettingsButton = new Button { Text = "Cancel", Top = currentTop, Left = column1Left + buttonWidth + columnGap, Width = buttonWidth, Height = buttonHeight, Font = largeFont };
+
+            // Add temporary button to test splash screen
+            var testSplashButton = new Button
+            {
+                Text = "Test Splash Screen",
+                Top = currentTop,
+                Left = column1Left + (buttonWidth + columnGap) * 2,
+                Width = buttonWidth,
+                Height = buttonHeight,
+                Font = largeFont
+            };
+            testSplashButton.Click += (s, e) =>
+            {
+                // Hardcode "Alan Wake" as the test game
+                var testGame = games.FirstOrDefault(g => g.DisplayName == "Alan Wake");
+                if (testGame != null)
+                {
+                    LaunchSplashScreen(testGame);
+                }
+                else
+                {
+                    MessageBox.Show("Test game 'Alan Wake' not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
+            currentTop += rowHeight;
+
             saveSettingsButton.Click += (s, e) =>
             {
                 try
@@ -355,6 +381,7 @@ namespace ArcadeLauncher.SW2
             mainPanel.Controls.Add(controllerButton);
             mainPanel.Controls.Add(saveSettingsButton);
             mainPanel.Controls.Add(cancelSettingsButton);
+            mainPanel.Controls.Add(testSplashButton); // Add the temporary button
             foreach (var textBox in buttonTextBoxes)
             {
                 mainPanel.Controls.Add(textBox);

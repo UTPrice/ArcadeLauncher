@@ -204,7 +204,7 @@ namespace ArcadeLauncher.SW2
                     { "client_secret", twitchClientSecret },
                     { "grant_type", "client_credentials" }
                 };
-                request.Content = new FormUrlEncodedContent(parameters); // Fixed typo: added dot between request and Content
+                request.Content = new FormUrlEncodedContent(parameters);
                 var response = await httpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
                 var jsonResponse = await response.Content.ReadAsStringAsync();
@@ -281,6 +281,13 @@ namespace ArcadeLauncher.SW2
                 }
             }
             return pluginList;
+        }
+
+        public void LaunchSplashScreen(Game game)
+        {
+            Logger.LogToFile($"Launching splash screen for game: {game.DisplayName}");
+            var splashForm = new SplashScreenForm(game, settings);
+            splashForm.Show();
         }
     }
 }
