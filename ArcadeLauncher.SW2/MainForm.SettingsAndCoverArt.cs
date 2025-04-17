@@ -393,11 +393,11 @@ namespace ArcadeLauncher.SW2
                 string requestBody;
                 if (assetType == "SplashScreen")
                 {
-                    requestBody = $"fields name, screenshots.url; search \"{gameName}\"; limit 50;";
+                    requestBody = $"fields name,screenshots.url; search \"{gameName}\"; limit 50;";
                 }
                 else
                 {
-                    requestBody = $"fields name, cover.url; search \"{gameName}\"; limit 50;";
+                    requestBody = $"fields name,cover.url; search \"{gameName}\"; limit 50;";
                 }
 
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
@@ -459,39 +459,78 @@ namespace ArcadeLauncher.SW2
                         }
 
                         string highResUrl;
+                        byte[] imageBytes = null;
                         if (assetType == "SplashScreen")
                         {
-                            // Try t_4k, fallback to t_1080p, then t_screenshot_big
-                            highResUrl = selectedCoverUrl.Replace("t_screenshot_med", "t_4k");
-                            Logger.LogToFile($"Attempting to fetch t_4k image from: {highResUrl}");
-                            var testResponse = await httpClient.GetAsync($"https:{highResUrl}", HttpCompletionOption.ResponseHeadersRead);
-                            if (!testResponse.IsSuccessStatusCode)
+                            // Prioritize t_1080p, then t_4k, then t_screenshot_big
+                            highResUrl = selectedCoverUrl.Replace("t_thumb", "t_1080p");
+                            Logger.LogToFile($"Attempting to fetch t_1080p image from: {highResUrl}");
+                            try
                             {
-                                highResUrl = selectedCoverUrl.Replace("t_screenshot_med", "t_1080p");
-                                Logger.LogToFile($"t_4k not available, falling back to t_1080p: {highResUrl}");
-                                testResponse = await httpClient.GetAsync($"https:{highResUrl}", HttpCompletionOption.ResponseHeadersRead);
-                                if (!testResponse.IsSuccessStatusCode)
+                                imageBytes = await httpClient.GetByteArrayAsync($"https:{highResUrl}");
+                                using (var ms = new MemoryStream(imageBytes))
+                                using (var tempImage = Image.FromStream(ms))
                                 {
-                                    highResUrl = selectedCoverUrl.Replace("t_screenshot_med", "t_screenshot_big");
-                                    Logger.LogToFile($"t_1080p not available, falling back to t_screenshot_big: {highResUrl}");
+                                    Logger.LogToFile($"Successfully fetched t_1080p image with dimensions: {tempImage.Width}x{tempImage.Height}");
                                 }
                             }
+                            catch (Exception ex)
+                            {
+                                Logger.LogToFile($"Failed to fetch t_1080p image: {ex.Message}");
+                                highResUrl = selectedCoverUrl.Replace("t_thumb", "t_4k");
+                                Logger.LogToFile($"Falling back to t_4k: {highResUrl}");
+                                try
+                                {
+                                    imageBytes = await httpClient.GetByteArrayAsync($"https:{highResUrl}");
+                                    using (var ms = new MemoryStream(imageBytes))
+                                    using (var tempImage = Image.FromStream(ms))
+                                    {
+                                        Logger.LogToFile($"Successfully fetched t_4k image with dimensions: {tempImage.Width}x{tempImage.Height}");
+                                    }
+                                }
+                                catch (Exception ex2)
+                                {
+                                    Logger.LogToFile($"Failed to fetch t_4k image: {ex2.Message}");
+                                    highResUrl = selectedCoverUrl.Replace("t_thumb", "t_screenshot_big");
+                                    Logger.LogToFile($"Falling back to t_screenshot_big: {highResUrl}");
+                                    try
+                                    {
+                                        imageBytes = await httpClient.GetByteArrayAsync($"https:{highResUrl}");
+                                        using (var ms = new MemoryStream(imageBytes))
+                                        using (var tempImage = Image.FromStream(ms))
+                                        {
+                                            Logger.LogToFile($"Successfully fetched t_screenshot_big image with dimensions: {tempImage.Width}x{tempImage.Height}");
+                                        }
+                                    }
+                                    catch (Exception ex3)
+                                    {
+                                        Logger.LogToFile($"Failed to fetch t_screenshot_big image: {ex3.Message}");
+                                        highResUrl = selectedCoverUrl;
+                                        Logger.LogToFile($"Falling back to original URL: {highResUrl}");
+                                        imageBytes = await httpClient.GetByteArrayAsync($"https:{highResUrl}");
+                                        using (var ms = new MemoryStream(imageBytes))
+                                        using (var tempImage = Image.FromStream(ms))
+                                        {
+                                            Logger.LogToFile($"Successfully fetched original image with dimensions: {tempImage.Width}x{tempImage.Height}");
+                                        }
+                                    }
+                                }
+                            }
+                            Logger.LogToFile($"Downloaded image size: {imageBytes.Length} bytes");
                         }
                         else
                         {
                             highResUrl = selectedCoverUrl.Replace("t_thumb", "t_1080p");
                             Logger.LogToFile($"Fetching t_1080p image for cover: {highResUrl}");
+                            imageBytes = await httpClient.GetByteArrayAsync($"https:{highResUrl}");
+                            Logger.LogToFile($"Downloaded image size: {imageBytes.Length} bytes");
                         }
-
-                        Logger.LogToFile($"Downloading high-res image from: {highResUrl}");
-                        var imageBytes = await httpClient.GetByteArrayAsync($"https:{highResUrl}");
-                        Logger.LogToFile($"Downloaded image size: {imageBytes.Length} bytes");
 
                         // Load the image to get its dimensions
                         using (var ms = new MemoryStream(imageBytes))
                         using (var tempImage = Image.FromStream(ms))
                         {
-                            Logger.LogToFile($"Downloaded image dimensions: {tempImage.Width}x{tempImage.Height}");
+                            Logger.LogToFile($"Final downloaded image dimensions before resizing: {tempImage.Width}x{tempImage.Height}");
                             if (tempImage.Width < 1920 || tempImage.Height < 1080)
                             {
                                 Logger.LogToFile($"Warning: Downloaded image is lower resolution than expected (1920x1080).");
@@ -526,6 +565,7 @@ namespace ArcadeLauncher.SW2
                                     g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                                     g.DrawImage(sourceImage, 0, 0, 3840, 2160);
                                     resizedImage.Save(destPath4k, System.Drawing.Imaging.ImageFormat.Png);
+                                    Logger.LogToFile($"Saved 4K splash screen image to: {destPath4k} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                                 }
                                 game.SplashScreenPath["4k"] = destPath4k;
                                 Logger.LogToFile($"Saved 4K splash screen image to: {destPath4k}");
@@ -542,6 +582,7 @@ namespace ArcadeLauncher.SW2
                                     g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                                     g.DrawImage(sourceImage, 0, 0, 2560, 1440);
                                     resizedImage.Save(destPath1440p, System.Drawing.Imaging.ImageFormat.Png);
+                                    Logger.LogToFile($"Saved 1440p splash screen image to: {destPath1440p} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                                 }
                                 game.SplashScreenPath["1440p"] = destPath1440p;
                                 Logger.LogToFile($"Saved 1440p splash screen image to: {destPath1440p}");
@@ -554,6 +595,7 @@ namespace ArcadeLauncher.SW2
                                     g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                                     g.DrawImage(sourceImage, 0, 0, 1920, 1080);
                                     resizedImage.Save(destPath1080p, System.Drawing.Imaging.ImageFormat.Png);
+                                    Logger.LogToFile($"Saved 1080p splash screen image to: {destPath1080p} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                                 }
                                 game.SplashScreenPath["1080p"] = destPath1080p;
                                 Logger.LogToFile($"Saved 1080p splash screen image to: {destPath1080p}");
@@ -699,6 +741,7 @@ namespace ArcadeLauncher.SW2
                                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                                 g.DrawImage(sourceImage, 0, 0, 3840, 2160);
                                 resizedImage.Save(destPath4k, System.Drawing.Imaging.ImageFormat.Png);
+                                Logger.LogToFile($"Saved 4K splash screen image to: {destPath4k} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                             }
                             game.SplashScreenPath["4k"] = destPath4k;
                             Logger.LogToFile($"Saved 4K splash screen image to: {destPath4k}");
@@ -714,6 +757,7 @@ namespace ArcadeLauncher.SW2
                                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                                 g.DrawImage(sourceImage, 0, 0, 2560, 1440);
                                 resizedImage.Save(destPath1440p, System.Drawing.Imaging.ImageFormat.Png);
+                                Logger.LogToFile($"Saved 1440p splash screen image to: {destPath1440p} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                             }
                             game.SplashScreenPath["1440p"] = destPath1440p;
                             Logger.LogToFile($"Saved 1440p splash screen image to: {destPath1440p}");
@@ -725,6 +769,7 @@ namespace ArcadeLauncher.SW2
                                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                                 g.DrawImage(sourceImage, 0, 0, 1920, 1080);
                                 resizedImage.Save(destPath1080p, System.Drawing.Imaging.ImageFormat.Png);
+                                Logger.LogToFile($"Saved 1080p splash screen image to: {destPath1080p} with dimensions: {resizedImage.Width}x{resizedImage.Height}");
                             }
                             game.SplashScreenPath["1080p"] = destPath1080p;
                             Logger.LogToFile($"Saved 1080p splash screen image to: {destPath1080p}");
@@ -923,7 +968,7 @@ namespace ArcadeLauncher.SW2
                             try
                             {
                                 Logger.LogToFile($"Processing game: {game.Name}, Screenshot URL: {screenshot.Url}");
-                                var coverUrl = screenshot.Url.Replace("t_screenshot_med", "t_1080p");
+                                var coverUrl = screenshot.Url.Replace("t_thumb", "t_1080p");
                                 Logger.LogToFile($"Fetching thumbnail image from: {coverUrl}");
                                 var imageBytes = await httpClient.GetByteArrayAsync($"https:{coverUrl}");
                                 Logger.LogToFile($"Successfully fetched thumbnail image for {game.Name}, size: {imageBytes.Length} bytes");
