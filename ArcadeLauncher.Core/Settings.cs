@@ -8,7 +8,7 @@ namespace ArcadeLauncher.Core
         public string DefaultMarqueeImage { get; set; } = "";
         public string DefaultControllerImage { get; set; } = "";
         public Dictionary<string, List<string>> InputMappings { get; set; }
-        public double FadeDuration { get; set; } = 0.5; // Default to 0.75 seconds
+        public double FadeDuration { get; set; } = 5.0; // Default to 0.75 seconds
 
         public Settings()
         {

@@ -10,11 +10,26 @@ namespace ArcadeLauncher.SW2
     public class SplashScreenForm : Form
     {
         // Configuration Parameters (Adjust these to tweak the layout)
-        private const double BarHeightPercentage = 0.10; // Bar height as a percentage of screen height (default 15%)
-        private const double BarPositionPercentage = 0.88; // Bar top position as a percentage of screen height from the top (default 85%, so bar bottom is at 100%)
-        private const float BaseFontSize = 32f; // Base font size in points before scaling (default 36pt at 1080p)
-        private const double ProgressBarOffsetPercentage = 0.02; // Offset between bar top and progress bar bottom as a percentage of screen height (default 1%)
-        private const double ProgressBarDiameterPercentage = 0.06; // Progress bar diameter as a percentage of screen width (default 15%)
+        private const double BarHeightPercentage = 0.09; // Bar height as a percentage of screen height (default 9%)
+        private const double BarPositionPercentage = 0.88; // Bar top position as a percentage of screen height from the top (default 88%, so bar bottom is at 97%)
+        private const float BaseFontSize = 32f; // Base font size in points before scaling (default 32pt at 1080p)
+        private const float BarBaseOpacity = 0.8f; // Base opacity of the title bar (default 80%)
+        private const double FadeStartPercentage = 30.0; // Percentage of horizontal width from center where fade starts (default 30%)
+        private const float FadeEndOpacity = 0.6f; // Opacity at the edges of the screen (default 60%)
+        private const double ProgressBarOffsetPercentage = 0.02; // Offset between bar top and progress bar bottom as a percentage of screen height (default 2%)
+        private const double ProgressBarDiameterPercentage = 0.06; // Progress bar diameter as a percentage of screen width (default 6%)
+        private const float FadeDurationSeconds = 0.6f; // Duration of fade-in and fade-out in seconds (default 0.6 seconds)
+        // Progress Meter Configuration
+        private const double BaseCircleDiameterPercentage = 0.06; // Base shadow arc diameter as a percentage of screen width (default 6%, defines center radius)
+        private const float BaseCircleOpacity = 0.18f; // Opacity of the base shadow arc (default 18%)
+        private const float BaseCircleFeatherDistance = 12.0f; // Feathering distance for base shadow arc edges in pixels (default 12, scaled by DPI)
+        private const float BaseShadowRingThickness = 2.0f; // Thickness of the base shadow arc in pixels (default 2, scaled by DPI, thicker than ProgressArcThickness)
+        private const float ProgressArcThickness = 5.0f; // Thickness of the cyan progress arc in pixels (default 5, scaled by DPI)
+        private const float ProgressTextFontSizePercentage = 0.18f; // Progress text font size as a percentage of progress diameter (default 18%)
+        private const float ProgressTextOutlineThickness = 1.5f; // Thickness of the text outline in pixels (default 1.5, scaled by DPI)
+        private const bool ProgressArcGlowEnabled = true; // Enable/disable glow effect for cyan arc (default true)
+        private const float ProgressArcGlowOpacity = 0.5f; // Opacity of the glow arc (default 50%)
+        private const float ProgressArcGlowThicknessMultiplier = 1.5f; // Multiplier for glow arc thickness relative to ProgressArcThickness (default 1.5x)
         // End Configuration Parameters
 
         private readonly Game game;
@@ -26,7 +41,6 @@ namespace ArcadeLauncher.SW2
         private double currentOpacity;
         private bool isFadingIn;
         private bool isFadingOut;
-        private bool isPaused; // TEMPORARY PAUSE FOR TESTING - REMOVE LATER
         private int progressValue;
         private double scalingFactor;
         private double dpiScalingFactor;
@@ -39,8 +53,6 @@ namespace ArcadeLauncher.SW2
         private int lastLoggedProgress; // To track the last logged progress value
         private const int ProgressDurationMs = 3000; // 3 seconds
         private const int FadeIntervalMs = 50;
-        private const double FadeStartPercentage = 0.1; // 10% of bar width for fade
-        private const float FadeEndOpacity = 0f; // Fade to fully transparent at edges
 
         public SplashScreenForm(Game game, Settings settings)
         {
@@ -76,12 +88,12 @@ namespace ArcadeLauncher.SW2
             Logger.LogToFile($"SplashScreenForm DPI: DpiY={dpiScalingFactor * 96}, DpiScalingFactor={dpiScalingFactor}");
 
             // Physical resolution (Bounds reports physical pixels in this context)
-            screenWidthPhysical = primaryScreen.Bounds.Width; // 1920 physical pixels
-            screenHeightPhysical = primaryScreen.Bounds.Height; // 1080 physical pixels
+            screenWidthPhysical = primaryScreen.Bounds.Width;
+            screenHeightPhysical = primaryScreen.Bounds.Height;
 
             // Calculate logical resolution for reference
-            int screenWidthLogical = (int)(screenWidthPhysical / dpiScalingFactor); // 1920 / 1.25 = 1536 logical pixels
-            int screenHeightLogical = (int)(screenHeightPhysical / dpiScalingFactor); // 1080 / 1.25 = 864 logical pixels
+            int screenWidthLogical = (int)(screenWidthPhysical / dpiScalingFactor);
+            int screenHeightLogical = (int)(screenHeightPhysical / dpiScalingFactor);
 
             // Log dimensions
             Logger.LogToFile($"Screen Bounds (Physical Pixels): Width={screenWidthPhysical}, Height={screenHeightPhysical}");
@@ -99,34 +111,17 @@ namespace ArcadeLauncher.SW2
             progressDiameter = (int)(screenWidthPhysical * ProgressBarDiameterPercentage);
             Logger.LogToFile($"Progress Diameter Calculation (Physical Pixels): screenWidthPhysical={screenWidthPhysical}, ProgressBarDiameterPercentage={ProgressBarDiameterPercentage}, progressDiameter={progressDiameter}");
 
-            fontSize = BaseFontSize * (float)scalingFactor;
-            Logger.LogToFile($"Font Size Calculation (Physical Pixels): BaseFontSize={BaseFontSize}, scalingFactor={scalingFactor}, fontSize={fontSize}");
+            fontSize = (float)(BaseFontSize * scalingFactor / dpiScalingFactor); // Compensate for DPI scaling
+            Logger.LogToFile($"Font Size Calculation (Logical Pixels): BaseFontSize={BaseFontSize}, scalingFactor={scalingFactor}, dpiScalingFactor={dpiScalingFactor}, fontSize={fontSize}");
 
             // Start with 0 opacity for fade-in
             Opacity = 0;
             currentOpacity = 0;
             isFadingIn = true;
             isFadingOut = false;
-            isPaused = false; // TEMPORARY PAUSE FOR TESTING - REMOVE LATER
             progressValue = 0;
             hasLoggedPositions = false;
             lastLoggedProgress = -1;
-
-            // TEMPORARY PAUSE FOR TESTING - REMOVE LATER
-            // Enable key input for the form to detect keypress
-            KeyPreview = true;
-            KeyDown += SplashScreenForm_KeyDown;
-        }
-
-        // TEMPORARY PAUSE FOR TESTING - REMOVE LATER
-        private void SplashScreenForm_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (isPaused)
-            {
-                isPaused = false;
-                isFadingOut = true;
-                Logger.LogToFile("Key pressed - resuming splash screen fade-out.");
-            }
         }
 
         private void LoadSplashImage()
@@ -185,7 +180,7 @@ namespace ArcadeLauncher.SW2
 
         private void FadeTimer_Tick(object sender, EventArgs e)
         {
-            double fadeStep = FadeIntervalMs / (settings.FadeDuration * 1000); // FadeDuration is in seconds
+            double fadeStep = FadeIntervalMs / (FadeDurationSeconds * 1000); // FadeDurationSeconds is in seconds
 
             if (isFadingIn)
             {
@@ -240,10 +235,7 @@ namespace ArcadeLauncher.SW2
             {
                 progressValue = 100;
                 progressTimer.Stop();
-                // TEMPORARY PAUSE FOR TESTING - REMOVE LATER
-                // Pause instead of immediately starting fade-out
-                isPaused = true;
-                Logger.LogToFile("Progress bar reached 100% - pausing for keypress.");
+                isFadingOut = true; // Start fading out immediately
             }
             Invalidate(); // Redraw the progress bar
         }
@@ -268,29 +260,92 @@ namespace ArcadeLauncher.SW2
                 g.DrawImage(splashImage, 0, 0, screenWidthPhysical, screenHeightPhysical);
             }
 
-            // Position the bar using BarPositionPercentage (in physical pixels)
-            int barY = (int)(screenHeightPhysical * BarPositionPercentage);
+            // Calculate progress meter position and size
+            int progressX = (screenWidthPhysical - progressDiameter) / 2;
+            int progressY = (int)(screenHeightPhysical * BarPositionPercentage) - progressDiameter - (int)(screenHeightPhysical * ProgressBarOffsetPercentage);
 
-            // Log positions in physical pixels (since Graphics treats them as physical)
-            if (!hasLoggedPositions)
+            // Draw the base shadow arc (thick, 360 degrees, radially feathered edges)
+            int baseArcCenterDiameter = (int)(screenWidthPhysical * BaseCircleDiameterPercentage);
+            float shadowArcThickness = BaseShadowRingThickness * (float)dpiScalingFactor;
+            float featherDistance = BaseCircleFeatherDistance * (float)dpiScalingFactor;
+
+            // Calculate the total width (thickness + feathering) and the number of steps for smoother feathering
+            float totalWidth = shadowArcThickness + (2 * featherDistance);
+            float stepSize = 0.1f * (float)dpiScalingFactor; // Step size of ~0.1 pixel, scaled by DPI
+            int featherSteps = (int)Math.Ceiling(totalWidth / stepSize / 2); // Number of steps on each side
+            float diameterStep = stepSize; // Diameter change per step
+            float opacityStep = BaseCircleOpacity / featherSteps; // Linear opacity step for reference
+
+            // Draw concentric arcs for the shadow ring with smoother feathering
+            int baseArcX = progressX + (progressDiameter - baseArcCenterDiameter) / 2;
+            int baseArcY = progressY + (progressDiameter - baseArcCenterDiameter) / 2;
+            for (int i = -featherSteps; i <= featherSteps; i++)
             {
-                Logger.LogToFile($"Bar Position (Physical Pixels): barY={barY}, barHeight={barHeight}, BottomEdge={barY + barHeight}, ScreenHeightPhysical={screenHeightPhysical}");
+                float currentDiameter = baseArcCenterDiameter + (i * diameterStep * 2);
+                if (currentDiameter <= 0) continue; // Skip if diameter becomes negative
+
+                // Use a cosine-based easing function for smoother opacity transitions
+                float t = (float)Math.Abs(i) / featherSteps; // Normalized position (0 at center, 1 at edge)
+                float easedT = (float)(1.0 - Math.Cos(t * Math.PI)) / 2.0f; // Cosine easing (0 to 1)
+                float currentOpacity = BaseCircleOpacity * (1.0f - easedT); // Apply easing to opacity
+                if (currentOpacity < 0) currentOpacity = 0;
+
+                int currentX = (int)(progressX + (progressDiameter - currentDiameter) / 2);
+                int currentY = (int)(progressY + (progressDiameter - currentDiameter) / 2);
+                using (var shadowPen = new Pen(Color.FromArgb((int)(currentOpacity * 255), 0, 0, 0), diameterStep * 4.0f))
+                {
+                    shadowPen.LineJoin = LineJoin.Round;
+                    shadowPen.StartCap = LineCap.Round;
+                    shadowPen.EndCap = LineCap.Round;
+                    g.DrawArc(shadowPen, currentX, currentY, (int)currentDiameter, (int)currentDiameter, 0, 360);
+                }
             }
 
-            // Draw the darkened bar
+            // Draw the progress arc
+            float arcThickness = ProgressArcThickness * (float)dpiScalingFactor;
+            int sweepAngle = (int)(progressValue * 3.6); // 360 degrees for 100%
+            if (ProgressArcGlowEnabled)
+            {
+                // Draw glow arc (semi-transparent, wider)
+                float glowThickness = arcThickness * ProgressArcGlowThicknessMultiplier;
+                using (var glowPen = new Pen(Color.FromArgb((int)(ProgressArcGlowOpacity * 255), 0, 255, 255), glowThickness))
+                {
+                    g.DrawArc(glowPen, progressX, progressY, progressDiameter, progressDiameter, -90, sweepAngle);
+                }
+            }
+            // Draw main cyan arc
+            using (var arcPen = new Pen(Color.Cyan, arcThickness))
+            {
+                g.DrawArc(arcPen, progressX, progressY, progressDiameter, progressDiameter, -90, sweepAngle);
+            }
+
+            // Draw the darkened bar with horizontal fade-out
+            int barY = (int)(screenHeightPhysical * BarPositionPercentage);
             using (var brush = new LinearGradientBrush(
                 new Rectangle(0, barY, screenWidthPhysical, barHeight),
-                Color.FromArgb(204, 0, 0, 0), // 80% opacity black
-                Color.Transparent,
+                Color.Black,
+                Color.Black,
                 LinearGradientMode.Horizontal))
             {
-                // Set the gradient stops for fading edges
-                brush.SetSigmaBellShape((float)FadeStartPercentage, FadeEndOpacity);
-                brush.SetSigmaBellShape(1f - (float)FadeStartPercentage, FadeEndOpacity);
+                // Define the gradient with a ColorBlend for symmetric fade-out
+                float fadeStart = (float)(0.5 - (FadeStartPercentage / 100.0)); // Start of fade as a fraction of width from center
+                float fadeEnd = (float)(0.5 + (FadeStartPercentage / 100.0)); // End of fade as a fraction of width from center
+                var blend = new ColorBlend
+                {
+                    Positions = new[] { 0.0f, fadeStart, fadeEnd, 1.0f },
+                    Colors = new[]
+                    {
+                        Color.FromArgb((int)(FadeEndOpacity * 255), 0, 0, 0), // Edge (left)
+                        Color.FromArgb((int)(BarBaseOpacity * 255), 0, 0, 0), // Start of fade (left)
+                        Color.FromArgb((int)(BarBaseOpacity * 255), 0, 0, 0), // Start of fade (right)
+                        Color.FromArgb((int)(FadeEndOpacity * 255), 0, 0, 0)  // Edge (right)
+                    }
+                };
+                brush.InterpolationColors = blend;
                 g.FillRectangle(brush, 0, barY, screenWidthPhysical, barHeight);
             }
 
-            // Draw the game name
+            // Draw the game name (Title Bar text)
             string gameName = game.DisplayName;
             using (var font = new Font("Microsoft Sans Serif", fontSize))
             using (var textBrush = new SolidBrush(Color.White))
@@ -305,44 +360,53 @@ namespace ArcadeLauncher.SW2
                 g.DrawString(gameName, font, textBrush, textX, textY);
             }
 
-            // Draw the radial progress bar
-            int progressX = (screenWidthPhysical - progressDiameter) / 2;
-            int progressY = barY - progressDiameter - (int)(screenHeightPhysical * ProgressBarOffsetPercentage);
-            if (!hasLoggedPositions)
+            // Draw the percentage text with outline
+            string progressText = $"{progressValue}%";
+            float progressFontSize = (float)((progressDiameter * ProgressTextFontSizePercentage) / dpiScalingFactor); // Compensate for DPI scaling
+            using (var font = new Font("Microsoft Sans Serif", progressFontSize))
             {
-                Logger.LogToFile($"Progress Bar Position (Physical Pixels): progressX={progressX}, progressY={progressY}, progressDiameter={progressDiameter}");
-            }
-            using (var outlinePen = new Pen(Color.Cyan, 4))
-            {
-                // Draw the outline circle
-                g.DrawEllipse(outlinePen, progressX, progressY, progressDiameter, progressDiameter);
+                var textSize = g.MeasureString(progressText, font);
+                float textX = progressX + (progressDiameter - textSize.Width) / 2;
+                float textY = progressY + (progressDiameter - textSize.Height) / 2;
 
-                // Draw the filled progress
-                using (var fillBrush = new SolidBrush(Color.FromArgb(128, 128, 128))) // Gray fill
+                float outlineThickness = ProgressTextOutlineThickness * (float)dpiScalingFactor;
+                // Draw outline by drawing text multiple times in black at 8 points around the text
+                using (var outlineBrush = new SolidBrush(Color.Black))
                 {
-                    int sweepAngle = (int)(progressValue * 3.6); // 360 degrees for 100%
-                    g.FillPie(fillBrush, progressX, progressY, progressDiameter, progressDiameter, -90, sweepAngle);
+                    float diagonalOffset = outlineThickness * (float)Math.Sqrt(2) / 2; // Adjust for diagonal distance
+                    // Cardinal directions
+                    g.DrawString(progressText, font, outlineBrush, textX - outlineThickness, textY); // Left
+                    g.DrawString(progressText, font, outlineBrush, textX + outlineThickness, textY); // Right
+                    g.DrawString(progressText, font, outlineBrush, textX, textY - outlineThickness); // Up
+                    g.DrawString(progressText, font, outlineBrush, textX, textY + outlineThickness); // Down
+                    // Diagonal directions
+                    g.DrawString(progressText, font, outlineBrush, textX - diagonalOffset, textY - diagonalOffset); // Up-Left
+                    g.DrawString(progressText, font, outlineBrush, textX + diagonalOffset, textY - diagonalOffset); // Up-Right
+                    g.DrawString(progressText, font, outlineBrush, textX - diagonalOffset, textY + diagonalOffset); // Down-Left
+                    g.DrawString(progressText, font, outlineBrush, textX + diagonalOffset, textY + diagonalOffset); // Down-Right
                 }
-
-                // Draw the percentage text
-                string progressText = $"{progressValue}%";
-                using (var font = new Font("Microsoft Sans Serif", fontSize * 0.5f))
+                // Draw main white text
                 using (var textBrush = new SolidBrush(Color.White))
                 {
-                    var textSize = g.MeasureString(progressText, font);
-                    float textX = progressX + (progressDiameter - textSize.Width) / 2;
-                    float textY = progressY + (progressDiameter - textSize.Height) / 2;
-                    // Log progress text position only at specific intervals (0%, 50%, 100%)
-                    if (progressValue == 0 || progressValue == 50 || progressValue == 100)
-                    {
-                        if (progressValue != lastLoggedProgress)
-                        {
-                            Logger.LogToFile($"Progress Text Position (Physical Pixels): textX={textX}, textY={textY}, textWidth={textSize.Width}, textHeight={textSize.Height}, ProgressValue={progressValue}%");
-                            lastLoggedProgress = progressValue;
-                        }
-                    }
                     g.DrawString(progressText, font, textBrush, textX, textY);
                 }
+
+                // Log progress text position only at specific intervals (0%, 50%, 100%)
+                if (progressValue == 0 || progressValue == 50 || progressValue == 100)
+                {
+                    if (progressValue != lastLoggedProgress)
+                    {
+                        Logger.LogToFile($"Progress Text Position (Physical Pixels): textX={textX}, textY={textY}, textWidth={textSize.Width}, textHeight={textSize.Height}, ProgressValue={progressValue}%");
+                        lastLoggedProgress = progressValue;
+                    }
+                }
+            }
+
+            // Log positions in physical pixels (since Graphics treats them as physical)
+            if (!hasLoggedPositions)
+            {
+                Logger.LogToFile($"Bar Position (Physical Pixels): barY={barY}, barHeight={barHeight}, BottomEdge={barY + barHeight}, ScreenHeightPhysical={screenHeightPhysical}");
+                Logger.LogToFile($"Progress Meter Position (Physical Pixels): progressX={progressX}, progressY={progressY}, progressDiameter={progressDiameter}, baseShadowArcCenterDiameter={baseArcCenterDiameter}, baseShadowArcThickness={shadowArcThickness}");
             }
 
             // Mark that we've logged the static positions
