@@ -76,6 +76,7 @@ namespace ArcadeLauncher.SW3
             this.WindowState = WindowState.Maximized; // Ensure full-screen
             this.ResizeMode = ResizeMode.NoResize; // Prevent resizing
             this.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(85, 85, 85)); // Restore original background color #555555
+            this.Topmost = true; // Ensure the main window is topmost
 
             InitializeComponent();
             SetupComponents();
@@ -86,6 +87,14 @@ namespace ArcadeLauncher.SW3
 
             // Initialize game logic
             InitializeGameLogic();
+
+            // Add focus event handlers for diagnostic logging
+            Activated += (s, e) => LogToFile("MainWindow activated.");
+            Deactivated += (s, e) =>
+            {
+                var activeWindow = GetForegroundWindow();
+                LogToFile($"MainWindow deactivated. Current foreground window handle: {activeWindow}");
+            };
 
             Loaded += (s, e) =>
             {
@@ -624,22 +633,36 @@ namespace ArcadeLauncher.SW3
                     WindowStyle = WindowStyle.None,
                     ResizeMode = ResizeMode.NoResize,
                     ShowInTaskbar = false, // Hide from taskbar
-                    Owner = this // Owned by the main window
+                    Owner = this, // Owned by the main window
+                    Background = System.Windows.Media.Brushes.Black // Ensure background is black
                 };
-                var marqueeImage = new System.Windows.Controls.Image
+                var marqueeGrid = new Grid();
+                var marqueeCurrentImage = new System.Windows.Controls.Image
                 {
-                    Stretch = Stretch.UniformToFill, // Stretch to fill the window, cropping if necessary
+                    Name = "CurrentImage",
+                    Stretch = Stretch.UniformToFill,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch
+                };
+                var marqueeNextImage = new System.Windows.Controls.Image
+                {
+                    Name = "NextImage",
+                    Stretch = Stretch.UniformToFill,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     VerticalAlignment = VerticalAlignment.Stretch,
-                    Name = "MarqueeImage"
+                    Opacity = 0
                 };
-                marqueeWindow.Content = marqueeImage;
+                marqueeGrid.Children.Add(marqueeCurrentImage);
+                marqueeGrid.Children.Add(marqueeNextImage);
+                marqueeWindow.Content = marqueeGrid;
                 string marqueeDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_marquee.png");
-                SetImageSourceSafely(marqueeImage, marqueeDefaultPath);
+                SetImageSourceSafely(marqueeCurrentImage, marqueeDefaultPath);
                 PositionWindowOnMonitor(marqueeWindow, 1, "Marquee");
                 // Set the image size to match the window's logical dimensions
-                marqueeImage.Width = marqueeWindow.Width;
-                marqueeImage.Height = marqueeWindow.Height;
+                marqueeCurrentImage.Width = marqueeWindow.Width;
+                marqueeCurrentImage.Height = marqueeWindow.Height;
+                marqueeNextImage.Width = marqueeWindow.Width;
+                marqueeNextImage.Height = marqueeWindow.Height;
                 marqueeWindow.Show();
                 LogToFile("Marquee window shown on Monitor 2.");
 
@@ -652,22 +675,36 @@ namespace ArcadeLauncher.SW3
                         WindowStyle = WindowStyle.None,
                         ResizeMode = ResizeMode.NoResize,
                         ShowInTaskbar = false, // Hide from taskbar
-                        Owner = this // Owned by the main window
+                        Owner = this, // Owned by the main window
+                        Background = System.Windows.Media.Brushes.Black // Ensure background is black
                     };
-                    var controllerImage = new System.Windows.Controls.Image
+                    var controllerGrid = new Grid();
+                    var controllerCurrentImage = new System.Windows.Controls.Image
                     {
-                        Stretch = Stretch.UniformToFill, // Stretch to fill the window, cropping if necessary
+                        Name = "CurrentImage",
+                        Stretch = Stretch.UniformToFill,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        VerticalAlignment = VerticalAlignment.Stretch
+                    };
+                    var controllerNextImage = new System.Windows.Controls.Image
+                    {
+                        Name = "NextImage",
+                        Stretch = Stretch.UniformToFill,
                         HorizontalAlignment = HorizontalAlignment.Stretch,
                         VerticalAlignment = VerticalAlignment.Stretch,
-                        Name = "ControllerImage"
+                        Opacity = 0
                     };
-                    controllerWindow.Content = controllerImage;
+                    controllerGrid.Children.Add(controllerCurrentImage);
+                    controllerGrid.Children.Add(controllerNextImage);
+                    controllerWindow.Content = controllerGrid;
                     string controllerDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_controller.png");
-                    SetImageSourceSafely(controllerImage, controllerDefaultPath);
+                    SetImageSourceSafely(controllerCurrentImage, controllerDefaultPath);
                     PositionWindowOnMonitor(controllerWindow, 2, "Controller");
                     // Set the image size to match the window's logical dimensions
-                    controllerImage.Width = controllerWindow.Width;
-                    controllerImage.Height = controllerWindow.Height;
+                    controllerCurrentImage.Width = controllerWindow.Width;
+                    controllerCurrentImage.Height = controllerWindow.Height;
+                    controllerNextImage.Width = controllerWindow.Width;
+                    controllerNextImage.Height = controllerWindow.Height;
                     controllerWindow.Show();
                     LogToFile("Controller window shown on Monitor 3.");
                 }
