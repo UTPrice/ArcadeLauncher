@@ -16,40 +16,39 @@ namespace ArcadeLauncher.SW3
     {
         private SplashScreenWindow splashScreenWindow;
 
-        // Configuration Parameters (Adjust these to tweak the layout)
-        private const double BarHeightPercentage = 0.09; // Bar height as a percentage of screen height (default 9%)
-        private const double BarPositionPercentage = 0.88; // Bar top position as a percentage of screen height from the top (default 88%, so bar bottom is at 97%)
-        private const float BaseFontSize = 48f; // Base font size for game title in physical points at 1080p
-        private const float BarBaseOpacity = 0.8f; // Base opacity of the title bar (default 80%)
-        private const double FadeStartPercentage = 30.0; // Percentage of horizontal width from center where fade starts (default 30%)
-        private const float FadeEndOpacity = 0.6f; // Opacity at the edges of the screen (default 60%)
-        private const double ProgressBarOffsetPercentage = 0.02; // Offset between bar top and progress bar bottom as a percentage of screen height (default 2%)
-        private const double ProgressBarDiameterPercentage = 0.06; // Progress bar diameter as a percentage of screen width (default 6%)
-        private const float FadeDurationSeconds = 0.6f; // Total duration for fade transitions (0.6 seconds)
-        private const float FadeInDurationSeconds = FadeDurationSeconds / 2; // Fade-in duration (0.3 seconds)
-        private const float FadeOutDurationSeconds = FadeDurationSeconds / 2; // Fade-out duration (0.3 seconds)
-        // Progress Meter Configuration
-        private const double BaseCircleRadiusPercentage = 0.06; // Base shadow arc radius as a percentage of screen width (default 6%, defines center radius)
-        private const float BaseCircleOpacity = 0.18f; // Opacity of the base shadow arc (default 18%)
-        private const float BaseCircleFeatherDistance = 12.0f; // Feathering distance for base shadow arc edges in physical pixels (default 12)
-        private const float BaseShadowRingThickness = 2.0f; // Thickness of the base shadow arc in physical pixels (default 2, thicker than ProgressArcThickness)
-        private const float ProgressArcThickness = 5.0f; // Thickness of the cyan progress arc in physical pixels (default 5)
-        private const float ProgressTextFontSizePercentage = 0.30f; // Progress text font size as a percentage of progress diameter in physical pixels (default 30%)
-        private const float ProgressTextOutlineThickness = 1.5f; // Thickness of the text outline in physical pixels (default 1.5)
-        private const bool ProgressArcGlowEnabled = true; // Enable/disable glow effect for cyan arc (default true)
-        private const float ProgressArcGlowOpacity = 0.5f; // Opacity of the glow arc (default 50%)
-        private const float ProgressArcGlowThicknessMultiplier = 1.5f; // Multiplier for glow arc thickness relative to ProgressArcThickness (default 1.5x)
-        private const int ProgressDurationMs = 3000; // 3 seconds
-        private const int ProgressUpdateIntervalMs = 30; // Update every 30ms for 1% increments
-        private const int FadeUpdateIntervalMs = 50; // Update interval for fade animations
-        // End Configuration Parameters
+        private const double BarHeightPercentage = 0.09;
+        private const double BarPositionPercentage = 0.88;
+        private const float BaseFontSize = 48f;
+        private const float BarBaseOpacity = 0.8f;
+        private const double FadeStartPercentage = 30.0;
+        private const float FadeEndOpacity = 0.6f;
+        private const double ProgressBarOffsetPercentage = 0.02;
+        private const double ProgressBarDiameterPercentage = 0.06;
+        private const float FadeDurationSeconds = 0.6f;
+        private const float FadeInDurationSeconds = FadeDurationSeconds / 2;
+        private const float FadeOutDurationSeconds = FadeDurationSeconds / 2;
+        private const float FadeInDurationT3 = 1.0f;
+        private const float FadeOutDurationT2 = 0.8f;
+        private const double BaseCircleRadiusPercentage = 0.06;
+        private const float BaseCircleOpacity = 0.18f;
+        private const float BaseCircleFeatherDistance = 12.0f;
+        private const float BaseShadowRingThickness = 2.0f;
+        private const float ProgressArcThickness = 5.0f;
+        private const float ProgressTextFontSizePercentage = 0.30f;
+        private const float ProgressTextOutlineThickness = 1.5f;
+        private const bool ProgressArcGlowEnabled = true;
+        private const float ProgressArcGlowOpacity = 0.5f;
+        private const float ProgressArcGlowThicknessMultiplier = 1.5f;
+        private const int ProgressDurationMs = 3000;
+        private const int ProgressUpdateIntervalMs = 30;
+        private const int FadeUpdateIntervalMs = 50;
 
         private class SplashScreenWindow : Window
         {
             private readonly MainWindow parentWindow;
             private readonly Game game;
             private readonly double dpiScaleFactor;
-            private readonly bool isLaunchPhase; // Flag to indicate if this is during game launch or exit
+            private readonly bool isLaunchPhase;
             private double currentOpacity;
             private bool isFadingIn;
             private bool isFadingOut;
@@ -86,20 +85,18 @@ namespace ArcadeLauncher.SW3
                 this.isLaunchPhase = isLaunchPhase;
                 this.startFadeTimerOnConstruction = startFadeTimer;
 
-                // Window properties
                 WindowStyle = WindowStyle.None;
                 ResizeMode = ResizeMode.NoResize;
                 ShowInTaskbar = false;
-                Topmost = true; // Ensure the splash screen is on top of all other windows
+                Topmost = true;
                 Background = System.Windows.Media.Brushes.Black;
                 Width = SystemParameters.PrimaryScreenWidth;
                 Height = SystemParameters.PrimaryScreenHeight;
-                Left = SystemParameters.PrimaryScreenWidth / dpiScaleFactor * 0; // Monitor 1 (primary)
+                Left = SystemParameters.PrimaryScreenWidth / dpiScaleFactor * 0;
                 Top = 0;
-                Visibility = Visibility.Hidden; // Start hidden to prevent flash
-                parentWindow.LogToFile($"SplashScreenWindow created. Initial Visibility: {Visibility}, isLaunchPhase: {isLaunchPhase}, startFadeTimerOnConstruction: {startFadeTimerOnConstruction}");
+                Visibility = Visibility.Hidden;
+                parentWindow.LogToFile($"SplashScreenWindow created at {DateTime.Now:HH:mm:ss.fff}. Initial Visibility: {Visibility}, isLaunchPhase: {isLaunchPhase}, startFadeTimerOnConstruction: {startFadeTimerOnConstruction}");
 
-                // Initialize state
                 currentOpacity = 0;
                 isFadingIn = true;
                 isFadingOut = false;
@@ -107,23 +104,18 @@ namespace ArcadeLauncher.SW3
                 hasLoggedPositions = false;
                 lastLoggedProgress = -1;
 
-                // Calculate physical resolution (logical * DPI scaling)
                 screenWidthPhysical = (int)(Width * dpiScaleFactor);
                 screenHeightPhysical = (int)(Height * dpiScaleFactor);
 
-                // Calculate resolution-based scaling factor (relative to 1080p in physical pixels)
                 scalingFactor = (double)screenHeightPhysical / 1080;
 
-                // Calculate UI element sizes in physical pixels
                 barHeight = (int)(screenHeightPhysical * BarHeightPercentage);
                 progressDiameter = (int)(screenWidthPhysical * ProgressBarDiameterPercentage);
-                fontSize = BaseFontSize * (float)scalingFactor / (float)dpiScaleFactor; // DPI compensation
+                fontSize = BaseFontSize * (float)scalingFactor / (float)dpiScaleFactor;
 
-                // Create the main canvas
                 canvas = new Canvas();
                 Content = canvas;
 
-                // Load and display the splash image
                 splashImageControl = new System.Windows.Controls.Image
                 {
                     Width = screenWidthPhysical / dpiScaleFactor,
@@ -136,37 +128,32 @@ namespace ArcadeLauncher.SW3
                 Canvas.SetTop(splashImageControl, 0);
                 canvas.Children.Add(splashImageControl);
 
-                // Create the shadow arc ellipse with a RadialGradientBrush
                 shadowArcEllipse = new System.Windows.Shapes.Ellipse();
                 RenderOptions.SetEdgeMode(shadowArcEllipse, EdgeMode.Aliased);
                 canvas.Children.Add(shadowArcEllipse);
 
-                // Create the glow arc path (if enabled)
                 if (ProgressArcGlowEnabled)
                 {
                     glowArcPath = new System.Windows.Shapes.Path
                     {
                         Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(ProgressArcGlowOpacity * 255), 0, 255, 255)),
-                        StrokeThickness = ProgressArcThickness / dpiScaleFactor // Logical pixels
+                        StrokeThickness = ProgressArcThickness / dpiScaleFactor
                     };
                     RenderOptions.SetEdgeMode(glowArcPath, EdgeMode.Aliased);
                     canvas.Children.Add(glowArcPath);
                 }
 
-                // Create the progress arc path
                 progressArcPath = new System.Windows.Shapes.Path
                 {
                     Stroke = System.Windows.Media.Brushes.Cyan,
-                    StrokeThickness = ProgressArcThickness / dpiScaleFactor // Logical pixels
+                    StrokeThickness = ProgressArcThickness / dpiScaleFactor
                 };
                 RenderOptions.SetEdgeMode(progressArcPath, EdgeMode.Aliased);
                 canvas.Children.Add(progressArcPath);
 
-                // Create the darkened bar
                 darkenedBar = new System.Windows.Shapes.Rectangle();
                 canvas.Children.Add(darkenedBar);
 
-                // Create the game name text
                 gameNameText = new System.Windows.Controls.TextBlock
                 {
                     Foreground = System.Windows.Media.Brushes.White,
@@ -177,7 +164,6 @@ namespace ArcadeLauncher.SW3
                 gameNameText.Text = game.DisplayName;
                 canvas.Children.Add(gameNameText);
 
-                // Create the progress text with outline using DropShadowEffect
                 progressText = new System.Windows.Controls.TextBlock
                 {
                     Foreground = System.Windows.Media.Brushes.White,
@@ -195,20 +181,17 @@ namespace ArcadeLauncher.SW3
                 progressText.Effect = shadowEffect;
                 canvas.Children.Add(progressText);
 
-                // Force layout pass to get correct ActualWidth and ActualHeight
-                double progressFontSize = (progressDiameter * ProgressTextFontSizePercentage) / dpiScaleFactor; // DPI compensation
+                double progressFontSize = (progressDiameter * ProgressTextFontSizePercentage) / dpiScaleFactor;
                 progressText.FontSize = progressFontSize;
-                progressText.Text = "0%"; // Set initial text to ensure proper sizing
+                progressText.Text = "0%";
                 progressText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 progressText.Arrange(new Rect(progressText.DesiredSize));
 
                 gameNameText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 gameNameText.Arrange(new Rect(gameNameText.DesiredSize));
 
-                // Initialize the UI elements before starting the fade-in
                 UpdateUI();
 
-                // Set the overlays to full visibility before the fade-in starts
                 splashImageControl.Opacity = 1;
                 shadowArcEllipse.Opacity = 1;
                 if (glowArcPath != null) glowArcPath.Opacity = 1;
@@ -217,25 +200,52 @@ namespace ArcadeLauncher.SW3
                 gameNameText.Opacity = 1;
                 progressText.Opacity = 1;
 
-                // Setup timers but don't start the fade timer unless specified
                 SetupTimers();
 
-                // Handle window closing
                 Closing += (s, e) =>
                 {
                     fadeTimer?.Stop();
                     progressTimer?.Stop();
-                    parentWindow.LogToFile("SplashScreenWindow closing. Timers stopped.");
+                    parentWindow.LogToFile($"SplashScreenWindow closing at {DateTime.Now:HH:mm:ss.fff}. Timers stopped.");
                 };
             }
 
             public void StartFadeTimer()
             {
-                currentOpacity = 0; // Reset opacity to ensure proper fade-in
-                isFadingIn = true; // Reset fading state
+                currentOpacity = 0;
+                isFadingIn = true;
                 Opacity = currentOpacity;
-                parentWindow.LogToFile($"Starting fadeTimer. Initial Opacity: {Opacity}, isFadingIn: {isFadingIn}");
+                parentWindow.LogToFile($"Starting fadeTimer at {DateTime.Now:HH:mm:ss.fff}. Initial Opacity: {Opacity}, isFadingIn: {isFadingIn}");
                 fadeTimer.Start();
+            }
+
+            public void StartFadeAnimation()
+            {
+                parentWindow.LogToFile($"Starting T3 fade-in animation with SineEase (EaseIn) at {DateTime.Now:HH:mm:ss.fff}. Initial Opacity: {Opacity}, Visibility: {Visibility}");
+                BeginAnimation(OpacityProperty, null);
+                var fadeInAnimation = new DoubleAnimation
+                {
+                    From = 0.0,
+                    To = 1.0,
+                    Duration = TimeSpan.FromSeconds(FadeInDurationT3),
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn }
+                };
+                var opacityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+                opacityTimer.Tick += (s, e) =>
+                {
+                    parentWindow.LogToFile($"T3 opacity update at {DateTime.Now:HH:mm:ss.fff}: SplashScreenWindow Opacity={Opacity}");
+                };
+                fadeInAnimation.Completed += (s, e) =>
+                {
+                    parentWindow.LogToFile($"T3 fade-in animation completed at {DateTime.Now:HH:mm:ss.fff}. Final Opacity: {Opacity}, Visibility: {Visibility}");
+                    progressTimer.Start();
+                    parentWindow.LogToFile($"ProgressTimer started for T3 at {DateTime.Now:HH:mm:ss.fff}.");
+                    opacityTimer.Stop();
+                    parentWindow.LogToFile($"T3 opacity timer stopped at {DateTime.Now:HH:mm:ss.fff}.");
+                };
+                Opacity = 0;
+                BeginAnimation(OpacityProperty, fadeInAnimation);
+                opacityTimer.Start();
             }
 
             private void LoadSplashImage()
@@ -257,18 +267,17 @@ namespace ArcadeLauncher.SW3
                 if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
                 {
                     splashImageControl.Source = new BitmapImage(new Uri(imagePath, UriKind.Absolute));
-                    parentWindow.LogToFile($"Loaded splash screen image: {imagePath}");
+                    parentWindow.LogToFile($"Loaded splash screen image at {DateTime.Now:HH:mm:ss.fff}: {imagePath}");
                 }
                 else
                 {
                     splashImageControl.Source = null;
-                    parentWindow.LogToFile("No splash screen image found, using black background.");
+                    parentWindow.LogToFile($"No splash screen image found at {DateTime.Now:HH:mm:ss.fff}, using black background.");
                 }
             }
 
             private void SetupTimers()
             {
-                // Fade timer for fade-in and fade-out
                 fadeTimer = new DispatcherTimer
                 {
                     Interval = TimeSpan.FromMilliseconds(FadeUpdateIntervalMs)
@@ -276,18 +285,17 @@ namespace ArcadeLauncher.SW3
                 fadeTimer.Tick += (s, e) => FadeTimer_Tick();
                 if (startFadeTimerOnConstruction)
                 {
-                    parentWindow.LogToFile("Starting fadeTimer on construction.");
+                    parentWindow.LogToFile($"Starting fadeTimer on construction at {DateTime.Now:HH:mm:ss.fff}.");
                     fadeTimer.Start();
                 }
                 else
                 {
-                    parentWindow.LogToFile("fadeTimer not started on construction; awaiting StartFadeTimer call.");
+                    parentWindow.LogToFile($"fadeTimer not started on construction at {DateTime.Now:HH:mm:ss.fff}; awaiting StartFadeTimer or StartFadeAnimation call.");
                 }
 
-                // Progress timer for radial progress bar (not started yet)
                 progressTimer = new DispatcherTimer
                 {
-                    Interval = TimeSpan.FromMilliseconds(ProgressUpdateIntervalMs) // 30ms for 1% increments
+                    Interval = TimeSpan.FromMilliseconds(ProgressUpdateIntervalMs)
                 };
                 progressTimer.Tick += (s, e) => ProgressTimer_Tick();
             }
@@ -297,11 +305,11 @@ namespace ArcadeLauncher.SW3
                 double fadeStep;
                 if (isFadingIn)
                 {
-                    fadeStep = FadeUpdateIntervalMs / (FadeInDurationSeconds * 1000); // Use fade-in duration (0.3s)
+                    fadeStep = FadeUpdateIntervalMs / (FadeInDurationSeconds * 1000);
                 }
                 else
                 {
-                    fadeStep = FadeUpdateIntervalMs / (FadeOutDurationSeconds * 1000); // Use fade-out duration (0.3s)
+                    fadeStep = FadeUpdateIntervalMs / (FadeOutDurationSeconds * 1000);
                 }
 
                 if (isFadingIn)
@@ -311,9 +319,8 @@ namespace ArcadeLauncher.SW3
                     {
                         currentOpacity = 1;
                         isFadingIn = false;
-                        // Start the progress bar now that fade-in is complete
                         progressTimer.Start();
-                        parentWindow.LogToFile("Fade-in complete. Starting progressTimer.");
+                        parentWindow.LogToFile($"Fade-in complete at {DateTime.Now:HH:mm:ss.fff}. Starting progressTimer.");
                     }
                 }
                 else if (isFadingOut)
@@ -323,15 +330,14 @@ namespace ArcadeLauncher.SW3
                     {
                         currentOpacity = 0;
                         fadeTimer.Stop();
-                        parentWindow.LogToFile("SplashScreenWindow fade-out complete, invoking onComplete.");
+                        parentWindow.LogToFile($"SplashScreenWindow fade-out complete at {DateTime.Now:HH:mm:ss.fff}, invoking onComplete.");
                         onComplete?.Invoke();
                         Close();
                     }
                 }
 
-                // Apply the opacity to the entire window, which will affect all elements
                 Opacity = currentOpacity;
-                parentWindow.LogToFile($"FadeTimer_Tick: isFadingIn={isFadingIn}, isFadingOut={isFadingOut}, currentOpacity={currentOpacity}, Window Opacity={Opacity}");
+                parentWindow.LogToFile($"FadeTimer_Tick at {DateTime.Now:HH:mm:ss.fff}: isFadingIn={isFadingIn}, isFadingOut={isFadingOut}, currentOpacity={currentOpacity}, Window Opacity={Opacity}");
             }
 
             private void ProgressTimer_Tick()
@@ -341,7 +347,6 @@ namespace ArcadeLauncher.SW3
                 {
                     progressValue = 100;
                     progressTimer.Stop();
-                    // During exit phase, start the cross-fade
                     if (!isLaunchPhase)
                     {
                         parentWindow.Dispatcher.Invoke(() =>
@@ -350,9 +355,8 @@ namespace ArcadeLauncher.SW3
                             parentWindow.Topmost = true;
                             parentWindow.Activate();
                             parentWindow.Focus();
-                            parentWindow.LogToFile("MainWindow made visible and focused before splash screen fade-out (exit phase).");
+                            parentWindow.LogToFile($"MainWindow made visible and focused before splash screen fade-out (exit phase) at {DateTime.Now:HH:mm:ss.fff}.");
 
-                            // Start cross-fade: fade out splash screen, fade in MainWindow
                             var fadeOutAnimation = new DoubleAnimation
                             {
                                 From = 1.0,
@@ -369,16 +373,29 @@ namespace ArcadeLauncher.SW3
                             this.BeginAnimation(OpacityProperty, fadeOutAnimation);
                             parentWindow.BeginAnimation(OpacityProperty, fadeInAnimation);
 
-                            // Update state to reflect that we're fading out
                             isFadingOut = true;
-                            currentOpacity = 1; // Ensure the timer continues the fade-out
-                            parentWindow.LogToFile("Starting cross-fade: SplashScreenWindow fade-out, MainWindow fade-in for exit phase.");
+                            currentOpacity = 1;
+                            parentWindow.LogToFile($"Starting T3 cross-fade at {DateTime.Now:HH:mm:ss.fff}: SplashScreenWindow fade-out, MainWindow fade-in for exit phase.");
                         });
                     }
                     else
                     {
-                        isFadingOut = true; // Start fading out normally during launch phase
-                        parentWindow.LogToFile("Starting fade-out for launch phase.");
+                        parentWindow.Dispatcher.Invoke(() =>
+                        {
+                            var fadeOutAnimation = new DoubleAnimation
+                            {
+                                From = 1.0,
+                                To = 0.0,
+                                Duration = TimeSpan.FromSeconds(FadeOutDurationT2)
+                            };
+                            fadeOutAnimation.Completed += (s, e) =>
+                            {
+                                parentWindow.LogToFile($"SplashScreenWindow fade-out complete for launch phase (Transition 2) at {DateTime.Now:HH:mm:ss.fff}.");
+                                onComplete?.Invoke();
+                            };
+                            this.BeginAnimation(OpacityProperty, fadeOutAnimation);
+                            parentWindow.LogToFile($"Starting fade-out for launch phase (Transition 2) at {DateTime.Now:HH:mm:ss.fff}.");
+                        });
                     }
                 }
                 UpdateUI();
@@ -386,18 +403,16 @@ namespace ArcadeLauncher.SW3
 
             private void UpdateUI()
             {
-                // Calculate progress meter position and size (convert physical to logical pixels)
-                double progressX = (screenWidthPhysical - progressDiameter) / 2 / dpiScaleFactor; // Center horizontally
+                double progressX = (screenWidthPhysical - progressDiameter) / 2 / dpiScaleFactor;
                 double progressY = (screenHeightPhysical * BarPositionPercentage - progressDiameter - screenHeightPhysical * ProgressBarOffsetPercentage) / dpiScaleFactor;
 
-                // Update the shadow arc using RadialGradientBrush
-                double baseArcCenterRadius = screenWidthPhysical * BaseCircleRadiusPercentage; // Radius in physical pixels
-                double baseArcCenterDiameter = baseArcCenterRadius * 2 / dpiScaleFactor; // Diameter in logical pixels
-                double shadowArcThickness = BaseShadowRingThickness / dpiScaleFactor; // Logical pixels
-                double featherDistance = BaseCircleFeatherDistance / dpiScaleFactor; // Logical pixels
-                double totalDiameter = baseArcCenterDiameter + 2 * featherDistance + 2 * shadowArcThickness; // Total diameter including thickness and feathering
-                double innerDiameter = baseArcCenterDiameter - 2 * shadowArcThickness; // Inner diameter of the ring (centerline - thickness)
-                double outerDiameter = baseArcCenterDiameter + 2 * shadowArcThickness; // Outer diameter of the ring (centerline + thickness)
+                double baseArcCenterRadius = screenWidthPhysical * BaseCircleRadiusPercentage;
+                double baseArcCenterDiameter = baseArcCenterRadius * 2 / dpiScaleFactor;
+                double shadowArcThickness = BaseShadowRingThickness / dpiScaleFactor;
+                double featherDistance = BaseCircleFeatherDistance / dpiScaleFactor;
+                double totalDiameter = baseArcCenterDiameter + 2 * featherDistance + 2 * shadowArcThickness;
+                double innerDiameter = baseArcCenterDiameter - 2 * shadowArcThickness;
+                double outerDiameter = baseArcCenterDiameter + 2 * shadowArcThickness;
 
                 shadowArcEllipse.Width = totalDiameter;
                 shadowArcEllipse.Height = totalDiameter;
@@ -412,20 +427,19 @@ namespace ArcadeLauncher.SW3
                     RadiusY = 0.5
                 };
                 double innerRadius = innerDiameter / totalDiameter / 2;
-                double peakRadius = baseArcCenterDiameter / totalDiameter / 2; // Centerline of the shadow ring
+                double peakRadius = baseArcCenterDiameter / totalDiameter / 2;
                 double featherStartRadius = (innerDiameter - featherDistance) / totalDiameter / 2;
                 double featherEndRadius = (outerDiameter + featherDistance) / totalDiameter / 2;
 
                 gradientBrush.GradientStops = new GradientStopCollection
                 {
-                    new GradientStop(Colors.Transparent, 0.0), // Fully transparent at the center
-                    new GradientStop(Colors.Transparent, innerRadius), // Start of the ring (inner edge)
-                    new GradientStop(Color.FromArgb((byte)(BaseCircleOpacity * 255), 0, 0, 0), peakRadius), // Peak opacity at the centerline
-                    new GradientStop(Colors.Transparent, featherEndRadius) // Fade to transparent at the outer feather edge
+                    new GradientStop(Colors.Transparent, 0.0),
+                    new GradientStop(Colors.Transparent, innerRadius),
+                    new GradientStop(Color.FromArgb((byte)(BaseCircleOpacity * 255), 0, 0, 0), peakRadius),
+                    new GradientStop(Colors.Transparent, featherEndRadius)
                 };
                 shadowArcEllipse.Fill = gradientBrush;
 
-                // Update the progress arc
                 int sweepAngle = (int)(progressValue * 3.6);
                 if (ProgressArcGlowEnabled && glowArcPath != null)
                 {
@@ -435,7 +449,6 @@ namespace ArcadeLauncher.SW3
                 var progressGeometry = CreateArcGeometry(progressX, progressY, progressDiameter / dpiScaleFactor, -90, sweepAngle);
                 progressArcPath.Data = progressGeometry;
 
-                // Update the darkened bar
                 int barY = (int)(screenHeightPhysical * BarPositionPercentage / dpiScaleFactor);
                 darkenedBar.Width = screenWidthPhysical / dpiScaleFactor;
                 darkenedBar.Height = barHeight / dpiScaleFactor;
@@ -457,12 +470,10 @@ namespace ArcadeLauncher.SW3
                 };
                 darkenedBar.Fill = gradientBrushBar;
 
-                // Update the game name text
                 Canvas.SetLeft(gameNameText, (screenWidthPhysical / dpiScaleFactor - gameNameText.ActualWidth) / 2);
                 Canvas.SetTop(gameNameText, barY + (barHeight / dpiScaleFactor - gameNameText.ActualHeight) / 2);
 
-                // Update the progress text with outline
-                double progressFontSize = (progressDiameter * ProgressTextFontSizePercentage) / dpiScaleFactor; // DPI compensation
+                double progressFontSize = (progressDiameter * ProgressTextFontSizePercentage) / dpiScaleFactor;
                 progressText.FontSize = progressFontSize;
                 progressText.Text = $"{progressValue}%";
                 double textX = progressX + (progressDiameter / dpiScaleFactor - progressText.ActualWidth) / 2;
@@ -470,21 +481,19 @@ namespace ArcadeLauncher.SW3
                 Canvas.SetLeft(progressText, textX);
                 Canvas.SetTop(progressText, textY);
 
-                // Log progress text position only at specific intervals (0%, 50%, 100%)
                 if (progressValue == 0 || progressValue == 50 || progressValue == 100)
                 {
                     if (progressValue != lastLoggedProgress)
                     {
-                        parentWindow.LogToFile($"Progress Text Position (Physical Pixels): textX={textX * dpiScaleFactor}, textY={textY * dpiScaleFactor}, textWidth={progressText.ActualWidth * dpiScaleFactor}, textHeight={progressText.ActualHeight * dpiScaleFactor}, ProgressValue={progressValue}%");
+                        parentWindow.LogToFile($"Progress Text Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: textX={textX * dpiScaleFactor}, textY={textY * dpiScaleFactor}, textWidth={progressText.ActualWidth * dpiScaleFactor}, textHeight={progressText.ActualHeight * dpiScaleFactor}, ProgressValue={progressValue}%");
                         lastLoggedProgress = progressValue;
                     }
                 }
 
-                // Log positions in physical pixels
                 if (!hasLoggedPositions)
                 {
-                    parentWindow.LogToFile($"Bar Position (Physical Pixels): barY={barY * dpiScaleFactor}, barHeight={barHeight}, BottomEdge={(barY + barHeight / dpiScaleFactor) * dpiScaleFactor}, ScreenHeightPhysical={screenHeightPhysical}");
-                    parentWindow.LogToFile($"Progress Meter Position (Physical Pixels): progressX={progressX * dpiScaleFactor}, progressY={progressY * dpiScaleFactor}, progressDiameter={progressDiameter}, baseShadowArcCenterDiameter={baseArcCenterDiameter * dpiScaleFactor}, baseShadowArcThickness={shadowArcThickness * dpiScaleFactor}");
+                    parentWindow.LogToFile($"Bar Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: barY={barY * dpiScaleFactor}, barHeight={barHeight}, BottomEdge={(barY + barHeight / dpiScaleFactor) * dpiScaleFactor}, ScreenHeightPhysical={screenHeightPhysical}");
+                    parentWindow.LogToFile($"Progress Meter Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: progressX={progressX * dpiScaleFactor}, progressY={progressY * dpiScaleFactor}, progressDiameter={progressDiameter}, baseShadowArcCenterDiameter={baseArcCenterDiameter * dpiScaleFactor}, baseShadowArcThickness={shadowArcThickness * dpiScaleFactor}");
                     hasLoggedPositions = true;
                 }
             }
