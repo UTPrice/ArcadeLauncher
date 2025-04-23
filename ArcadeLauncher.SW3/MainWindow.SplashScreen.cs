@@ -27,7 +27,7 @@ namespace ArcadeLauncher.SW3
         private const float FadeDurationSeconds = 0.6f;
         private const float FadeInDurationSeconds = FadeDurationSeconds / 2;
         private const float FadeOutDurationSeconds = FadeDurationSeconds / 2;
-        private const float FadeInDurationT3 = 1.0f;
+        private const float FadeInDurationT3 = 0.8f;
         private const float FadeOutDurationT2 = 0.8f;
         private const double BaseCircleRadiusPercentage = 0.06;
         private const float BaseCircleOpacity = 0.18f;
@@ -217,6 +217,12 @@ namespace ArcadeLauncher.SW3
                 Opacity = currentOpacity;
                 parentWindow.LogToFile($"Starting fadeTimer at {DateTime.Now:HH:mm:ss.fff}. Initial Opacity: {Opacity}, isFadingIn: {isFadingIn}");
                 fadeTimer.Start();
+            }
+
+            public void StartProgressTimer()
+            {
+                parentWindow.LogToFile($"Starting progressTimer for T1 at {DateTime.Now:HH:mm:ss.fff}.");
+                progressTimer.Start();
             }
 
             public void StartFadeAnimation()

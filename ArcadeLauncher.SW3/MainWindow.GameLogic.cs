@@ -23,6 +23,9 @@ namespace ArcadeLauncher.SW3
         private bool isGameActive;
         private const int DoublePressThreshold = 500;
         private IntPtr hookId = IntPtr.Zero;
+        private const float T1FadeOutDuration = 0.8f;
+        private const float T1FadeInDuration = 0.8f;
+        private const float T1OverlapPercentage = 0.98f;
 
         private delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
         private const int WH_KEYBOARD_LL = 13;
@@ -81,69 +84,84 @@ namespace ArcadeLauncher.SW3
 
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN)
+            try
             {
-                int vkCode = Marshal.ReadInt32(lParam);
-                string keyString = KeyInterop.KeyFromVirtualKey(vkCode).ToString();
-                LogToFile($"Global hook detected key down at {DateTime.Now:HH:mm:ss.fff}: {keyString}");
-
-                if (!isGameActive)
+                if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN)
                 {
-                    var mainWindowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-                    var currentForegroundWindow = GetForegroundWindow();
-                    if (currentForegroundWindow != mainWindowHandle)
-                    {
-                        Dispatcher.Invoke(() =>
-                        {
-                            SetForegroundWindow(mainWindowHandle);
-                            Activate();
-                            Focus();
-                            LogToFile($"Restored focus to MainWindow on key down at {DateTime.Now:HH:mm:ss.fff} (handle: {mainWindowHandle}), previous foreground window was: {currentForegroundWindow}");
-                        });
-                    }
-                }
+                    int vkCode = Marshal.ReadInt32(lParam);
+                    string keyString = KeyInterop.KeyFromVirtualKey(vkCode).ToString();
+                    LogToFile($"Global hook detected key down at {DateTime.Now:HH:mm:ss.fff}: {keyString}");
 
-                if (settings != null && settings.InputMappings.ContainsKey("Kill") && settings.InputMappings["Kill"].Any())
-                {
-                    if (settings.InputMappings["Kill"].Contains(keyString, StringComparer.OrdinalIgnoreCase))
+                    if (!isGameActive)
                     {
-                        DateTime currentTime = DateTime.Now;
-                        if (lastKillPressTime.HasValue && (currentTime - lastKillPressTime.Value).TotalMilliseconds <= DoublePressThreshold)
+                        var mainWindowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                        var currentForegroundWindow = GetForegroundWindow();
+                        if (currentForegroundWindow != mainWindowHandle)
                         {
                             Dispatcher.Invoke(() =>
                             {
-                                LogToFile($"Global hook: Kill Switch double-press detected for key {keyString} at {DateTime.Now:HH:mm:ss.fff}. Active process state: {activeProcess?.HasExited ?? true}");
-                                if (isGameActive && activeProcess != null && !activeProcess.HasExited)
+                                try
                                 {
-                                    try
-                                    {
-                                        LogToFile($"Attempting to terminate process at {DateTime.Now:HH:mm:ss.fff}: {activeProcess.StartInfo.FileName}");
-                                        activeProcess.Kill();
-                                        LogToFile($"Process terminated at {DateTime.Now:HH:mm:ss.fff}: {activeProcess.StartInfo.FileName}");
-                                        PerformPostExitCleanup();
-                                        isGameActive = false;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        LogToFile($"Failed to terminate process at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                                    }
+                                    SetForegroundWindow(mainWindowHandle);
+                                    Activate();
+                                    Focus();
+                                    LogToFile($"Restored focus to MainWindow on key down at {DateTime.Now:HH:mm:ss.fff} (handle: {mainWindowHandle}), previous foreground window was: {currentForegroundWindow}");
                                 }
-                                else
+                                catch (Exception ex)
                                 {
-                                    LogToFile($"Global hook: No active process to terminate or process already exited at {DateTime.Now:HH:mm:ss.fff}.");
+                                    LogToFile($"Error restoring focus in HookCallback at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
                                 }
-                                lastKillPressTime = null;
                             });
                         }
-                        else
+                    }
+
+                    if (settings != null && settings.InputMappings.ContainsKey("Kill") && settings.InputMappings["Kill"].Any())
+                    {
+                        if (settings.InputMappings["Kill"].Contains(keyString, StringComparer.OrdinalIgnoreCase))
                         {
-                            lastKillPressTime = currentTime;
-                            LogToFile($"Global hook: Kill Switch single press detected for key {keyString} at {DateTime.Now:HH:mm:ss.fff}. Waiting for second press within {DoublePressThreshold}ms.");
+                            DateTime currentTime = DateTime.Now;
+                            if (lastKillPressTime.HasValue && (currentTime - lastKillPressTime.Value).TotalMilliseconds <= DoublePressThreshold)
+                            {
+                                Dispatcher.Invoke(() =>
+                                {
+                                    LogToFile($"Global hook: Kill Switch double-press detected for key {keyString} at {DateTime.Now:HH:mm:ss.fff}. Active process state: {activeProcess?.HasExited ?? true}");
+                                    if (isGameActive && activeProcess != null && !activeProcess.HasExited)
+                                    {
+                                        try
+                                        {
+                                            LogToFile($"Attempting to terminate process at {DateTime.Now:HH:mm:ss.fff}: {activeProcess.StartInfo.FileName}");
+                                            activeProcess.Kill();
+                                            LogToFile($"Process terminated at {DateTime.Now:HH:mm:ss.fff}: {activeProcess.StartInfo.FileName}");
+                                            PerformPostExitCleanup();
+                                            isGameActive = false;
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            LogToFile($"Failed to terminate process at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        LogToFile($"Global hook: No active process to terminate or process already exited at {DateTime.Now:HH:mm:ss.fff}.");
+                                    }
+                                    lastKillPressTime = null;
+                                });
+                            }
+                            else
+                            {
+                                lastKillPressTime = currentTime;
+                                LogToFile($"Global hook: Kill Switch single press detected for key {keyString} at {DateTime.Now:HH:mm:ss.fff}. Waiting for second press within {DoublePressThreshold}ms.");
+                            }
                         }
                     }
                 }
+                return CallNextHookEx(hookId, nCode, wParam, lParam);
             }
-            return CallNextHookEx(hookId, nCode, wParam, lParam);
+            catch (Exception ex)
+            {
+                LogToFile($"Error in HookCallback at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                return CallNextHookEx(hookId, nCode, wParam, lParam);
+            }
         }
 
         private void PerformPostExitCleanup()
@@ -212,10 +230,17 @@ namespace ArcadeLauncher.SW3
                         splashScreenWindow.Visibility = Visibility.Visible;
                         splashScreenWindow.Show();
                         var splashHandle = new System.Windows.Interop.WindowInteropHelper(splashScreenWindow).Handle;
-                        SetForegroundWindow(splashHandle);
-                        splashScreenWindow.Activate();
-                        splashScreenWindow.Focus();
-                        LogToFile($"SplashScreenWindow shown for T3 exit phase at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}");
+                        try
+                        {
+                            SetForegroundWindow(splashHandle);
+                            splashScreenWindow.Activate();
+                            splashScreenWindow.Focus();
+                            LogToFile($"SplashScreenWindow shown for T3 exit phase at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}");
+                        }
+                        catch (Exception ex)
+                        {
+                            LogToFile($"Error setting focus for T3 SplashScreenWindow at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                        }
 
                         Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
                         LogToFile($"SplashScreenWindow render forced for T3 at {DateTime.Now:HH:mm:ss.fff}.");
@@ -230,8 +255,15 @@ namespace ArcadeLauncher.SW3
                             var currentForeground = GetForegroundWindow();
                             if (currentForeground != splashHandle)
                             {
-                                SetForegroundWindow(splashHandle);
-                                LogToFile($"T3 focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called for SplashScreenWindow, current foreground was {currentForeground}, target handle: {splashHandle}");
+                                try
+                                {
+                                    SetForegroundWindow(splashHandle);
+                                    LogToFile($"T3 focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called for SplashScreenWindow, current foreground was {currentForeground}, target handle: {splashHandle}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    LogToFile($"Error in T3 focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                                }
                             }
                             if (focusAttempts >= 20)
                             {
@@ -253,8 +285,15 @@ namespace ArcadeLauncher.SW3
                         Focus();
 
                         var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-                        SetForegroundWindow(handle);
-                        LogToFile($"Game selection screen restored (no game found) and set to foreground window with handle: {handle} at {DateTime.Now:HH:mm:ss.fff}");
+                        try
+                        {
+                            SetForegroundWindow(handle);
+                            LogToFile($"Game selection screen restored (no game found) and set to foreground window with handle: {handle} at {DateTime.Now:HH:mm:ss.fff}");
+                        }
+                        catch (Exception ex)
+                        {
+                            LogToFile($"Error setting foreground window for game selection screen at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                        }
 
                         StartFocusRestorationLoop();
                     }
@@ -278,8 +317,15 @@ namespace ArcadeLauncher.SW3
                 var currentForegroundWindow = GetForegroundWindow();
                 if (currentForegroundWindow != handle)
                 {
-                    SetForegroundWindow(handle);
-                    LogToFile($"Focus restoration attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called, current foreground window was {currentForegroundWindow}, target handle: {handle}");
+                    try
+                    {
+                        SetForegroundWindow(handle);
+                        LogToFile($"Focus restoration attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called, current foreground window was {currentForegroundWindow}, target handle: {handle}");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToFile($"Error in focus restoration attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                    }
                 }
                 else
                 {
@@ -303,8 +349,15 @@ namespace ArcadeLauncher.SW3
             if (handle == IntPtr.Zero)
             {
                 LogToFile($"Game process MainWindowHandle is zero at {DateTime.Now:HH:mm:ss.fff}. Waiting for valid handle.");
-                gameProcess.WaitForInputIdle(1000);
-                handle = gameProcess.MainWindowHandle;
+                try
+                {
+                    gameProcess.WaitForInputIdle(1000);
+                    handle = gameProcess.MainWindowHandle;
+                }
+                catch (Exception ex)
+                {
+                    LogToFile($"Error waiting for game process input idle at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                }
             }
 
             var focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
@@ -317,8 +370,15 @@ namespace ArcadeLauncher.SW3
                 var currentForeground = GetForegroundWindow();
                 if (currentForeground != handle && !gameProcess.HasExited)
                 {
-                    SetForegroundWindow(handle);
-                    LogToFile($"Game focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called for game process, current foreground was {currentForeground}, target handle: {handle}");
+                    try
+                    {
+                        SetForegroundWindow(handle);
+                        LogToFile($"Game focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called for game process, current foreground was {currentForeground}, target handle: {handle}");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToFile($"Error in game focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                    }
                 }
                 if (focusAttempts >= maxAttempts || gameProcess.HasExited)
                 {
@@ -571,39 +631,6 @@ namespace ArcadeLauncher.SW3
                     LogToFile($"HideMouseCursor is false, moved cursor to center of screen (physical): ({centerX}, {centerY}) at {DateTime.Now:HH:mm:ss.fff}");
                 }
 
-                if (marqueeWindow != null && marqueeWindow.Content is Grid marqueeGrid)
-                {
-                    string marqueePath = game.MarqueePath ?? System.IO.Path.Combine(Program.InstallDir, "default_marquee.png");
-                    FadeImage(marqueeGrid, new BitmapImage(new Uri(marqueePath, UriKind.Absolute)));
-                }
-
-                if (controllerWindow != null && controllerWindow.Content is Grid controllerGrid)
-                {
-                    string splashImagePath = null;
-                    if (screenHeightPhysical >= 2160 && game.SplashScreenPath.ContainsKey("4k"))
-                    {
-                        splashImagePath = game.SplashScreenPath["4k"];
-                    }
-                    else if (screenHeightPhysical >= 1440 && game.SplashScreenPath.ContainsKey("1440p"))
-                    {
-                        splashImagePath = game.SplashScreenPath["1440p"];
-                    }
-                    else if (game.SplashScreenPath.ContainsKey("1080p"))
-                    {
-                        splashImagePath = game.SplashScreenPath["1080p"];
-                    }
-
-                    if (!string.IsNullOrEmpty(splashImagePath) && File.Exists(splashImagePath))
-                    {
-                        FadeImage(controllerGrid, new BitmapImage(new Uri(splashImagePath, UriKind.Absolute)));
-                    }
-                    else
-                    {
-                        string controllerDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_controller.png");
-                        FadeImage(controllerGrid, new BitmapImage(new Uri(controllerDefaultPath, UriKind.Absolute)));
-                    }
-                }
-
                 foreach (var cmd in game.PreLaunchCommands ?? new List<string>())
                 {
                     RunCommand(cmd, "Pre-Launch Command");
@@ -636,65 +663,178 @@ namespace ArcadeLauncher.SW3
                     }
                 }, isLaunchPhase: true, startFadeTimer: false);
 
+                // T1 Fade-Out: MainWindow fades out with SineEase (EaseOut) over 0.8s
                 var fadeOutAnimation = new DoubleAnimation
                 {
                     From = 1.0,
                     To = 0.0,
-                    Duration = TimeSpan.FromSeconds(FadeDurationSeconds / 2)
+                    Duration = TimeSpan.FromSeconds(T1FadeOutDuration),
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
                 };
-                fadeOutAnimation.Completed += (s, e) =>
+
+                // T1 Fade-In: SplashScreenWindow fades in with SineEase over 0.8s, starting at 90% of fade-out
+                var fadeInAnimation = new DoubleAnimation
                 {
+                    From = 0.0,
+                    To = 1.0,
+                    Duration = TimeSpan.FromSeconds(T1FadeInDuration),
+                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn }
+                };
+
+                // Log opacity updates for fade-out
+                var fadeOutTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+                fadeOutTimer.Tick += (s, e) =>
+                {
+                    LogToFile($"T1 MainWindow fade-out opacity update at {DateTime.Now:HH:mm:ss.fff}: Opacity={Opacity}");
+                };
+
+                // Start fade-out after a brief delay to ensure rendering
+                var startDelayTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(0.05) };
+                startDelayTimer.Tick += (s, e) =>
+                {
+                    startDelayTimer.Stop();
+                    LogToFile($"Starting T1 MainWindow fade-out (SineEase, EaseOut, {T1FadeOutDuration}s) at {DateTime.Now:HH:mm:ss.fff}.");
+                    try
+                    {
+                        fadeOutTimer.Start();
+                        this.BeginAnimation(OpacityProperty, fadeOutAnimation);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToFile($"Error starting T1 MainWindow fade-out at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                    }
+                };
+                startDelayTimer.Start();
+
+                // Start fade-in at 90% of fade-out duration (0.8s * 0.9 = 0.72s)
+                var overlapTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(T1FadeOutDuration * T1OverlapPercentage)
+                };
+                overlapTimer.Tick += (s, e) =>
+                {
+                    overlapTimer.Stop();
                     splashScreenWindow.Opacity = 0;
                     splashScreenWindow.Visibility = Visibility.Visible;
                     splashScreenWindow.Show();
                     var splashHandle = new System.Windows.Interop.WindowInteropHelper(splashScreenWindow).Handle;
-                    SetForegroundWindow(splashHandle);
-                    splashScreenWindow.Activate();
-                    splashScreenWindow.Focus();
-                    LogToFile($"SplashScreenWindow shown for launch phase at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}");
-                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-                    LogToFile($"SplashScreenWindow render forced after Show() in launch phase at {DateTime.Now:HH:mm:ss.fff}.");
-                    splashScreenWindow.StartFadeTimer();
-                    Visibility = Visibility.Hidden;
+                    try
+                    {
+                        SetForegroundWindow(splashHandle);
+                        splashScreenWindow.Activate();
+                        splashScreenWindow.Focus();
+                        LogToFile($"Starting T1 SplashScreenWindow fade-in (SineEase, {T1FadeInDuration}s) at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}, Overlap: {T1OverlapPercentage}");
+                        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+                        LogToFile($"SplashScreenWindow render forced for T1 fade-in at {DateTime.Now:HH:mm:ss.fff}.");
+                        splashScreenWindow.BeginAnimation(OpacityProperty, fadeInAnimation);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToFile($"Error starting T1 SplashScreenWindow fade-in at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                    }
                 };
-                this.BeginAnimation(OpacityProperty, fadeOutAnimation);
+                overlapTimer.Start();
 
-                if (game.Type == "PC")
+                // Finalize fade-out
+                fadeOutAnimation.Completed += (s, e) =>
                 {
-                    Process gameProcess = new Process();
-                    gameProcess.StartInfo.FileName = game.ExecutablePath;
-                    gameProcess.StartInfo.UseShellExecute = true;
-                    gameProcess.EnableRaisingEvents = true;
-                    isGameActive = true;
-                    gameProcess.Exited += (s, e) => Dispatcher.Invoke(() => PerformPostExitCleanup());
-                    gameProcess.Start();
-                    activeProcess = gameProcess;
-                    LogToFile($"Launched PC game at {DateTime.Now:HH:mm:ss.fff}: {game.ExecutablePath}");
-                }
-                else if (game.Type == "Emulated")
+                    fadeOutTimer.Stop();
+                    Visibility = Visibility.Hidden;
+                    LogToFile($"T1 MainWindow fade-out completed at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}");
+
+                    // Update marquee and controller images after fade-out
+                    if (marqueeWindow != null && marqueeWindow.Content is Grid marqueeGrid)
+                    {
+                        string marqueePath = game.MarqueePath ?? System.IO.Path.Combine(Program.InstallDir, "default_marquee.png");
+                        FadeImage(marqueeGrid, new BitmapImage(new Uri(marqueePath, UriKind.Absolute)));
+                    }
+
+                    if (controllerWindow != null && controllerWindow.Content is Grid controllerGrid)
+                    {
+                        string splashImagePath = null;
+                        if (screenHeightPhysical >= 2160 && game.SplashScreenPath.ContainsKey("4k"))
+                        {
+                            splashImagePath = game.SplashScreenPath["4k"];
+                        }
+                        else if (screenHeightPhysical >= 1440 && game.SplashScreenPath.ContainsKey("1440p"))
+                        {
+                            splashImagePath = game.SplashScreenPath["1440p"];
+                        }
+                        else if (game.SplashScreenPath.ContainsKey("1080p"))
+                        {
+                            splashImagePath = game.SplashScreenPath["1080p"];
+                        }
+
+                        if (!string.IsNullOrEmpty(splashImagePath) && File.Exists(splashImagePath))
+                        {
+                            FadeImage(controllerGrid, new BitmapImage(new Uri(splashImagePath, UriKind.Absolute)));
+                        }
+                        else
+                        {
+                            string controllerDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_controller.png");
+                            FadeImage(controllerGrid, new BitmapImage(new Uri(controllerDefaultPath, UriKind.Absolute)));
+                        }
+                    }
+
+                    // Launch game after fade-out
+                    try
+                    {
+                        if (game.Type == "PC")
+                        {
+                            Process gameProcess = new Process();
+                            gameProcess.StartInfo.FileName = game.ExecutablePath;
+                            gameProcess.StartInfo.UseShellExecute = true;
+                            gameProcess.EnableRaisingEvents = true;
+                            isGameActive = true;
+                            gameProcess.Exited += (s2, e2) => Dispatcher.Invoke(() => PerformPostExitCleanup());
+                            gameProcess.Start();
+                            activeProcess = gameProcess;
+                            LogToFile($"Launched PC game at {DateTime.Now:HH:mm:ss.fff}: {game.ExecutablePath}");
+                        }
+                        else if (game.Type == "Emulated")
+                        {
+                            var plugin = plugins.FirstOrDefault(p => p.Name == game.EmulatorPlugin);
+                            if (plugin != null)
+                            {
+                                plugin.PreLaunch(game.EmulatorPath, game.RomPath);
+                                var cmd = plugin.BuildLaunchCommand(game.EmulatorPath, game.RomPath, game.CustomParameters);
+                                Process emulatorProcess = new Process();
+                                emulatorProcess.StartInfo.FileName = "cmd.exe";
+                                emulatorProcess.StartInfo.Arguments = $"/c {cmd}";
+                                emulatorProcess.StartInfo.UseShellExecute = true;
+                                emulatorProcess.EnableRaisingEvents = true;
+                                isGameActive = true;
+                                emulatorProcess.Exited += (s2, e2) => Dispatcher.Invoke(() => PerformPostExitCleanup());
+                                emulatorProcess.Start();
+                                activeProcess = emulatorProcess;
+                                LogToFile($"Launched emulated game at {DateTime.Now:HH:mm:ss.fff}: {cmd}");
+                            }
+                            else
+                            {
+                                LogToFile($"Emulator plugin not found for game type: {game.EmulatorPlugin} at {DateTime.Now:HH:mm:ss.fff}");
+                                throw new Exception($"Emulator plugin not found: {game.EmulatorPlugin}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToFile($"Error launching game after T1 fade-out at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                    }
+                };
+
+                // Start progress timer after fade-in
+                fadeInAnimation.Completed += (s, e) =>
                 {
-                    var plugin = plugins.FirstOrDefault(p => p.Name == game.EmulatorPlugin);
-                    if (plugin != null)
+                    LogToFile($"T1 SplashScreenWindow fade-in completed at {DateTime.Now:HH:mm:ss.fff}. Starting progress timer.");
+                    try
                     {
-                        plugin.PreLaunch(game.EmulatorPath, game.RomPath);
-                        var cmd = plugin.BuildLaunchCommand(game.EmulatorPath, game.RomPath, game.CustomParameters);
-                        Process emulatorProcess = new Process();
-                        emulatorProcess.StartInfo.FileName = "cmd.exe";
-                        emulatorProcess.StartInfo.Arguments = $"/c {cmd}";
-                        emulatorProcess.StartInfo.UseShellExecute = true;
-                        emulatorProcess.EnableRaisingEvents = true;
-                        isGameActive = true;
-                        emulatorProcess.Exited += (s, e) => Dispatcher.Invoke(() => PerformPostExitCleanup());
-                        emulatorProcess.Start();
-                        activeProcess = emulatorProcess;
-                        LogToFile($"Launched emulated game at {DateTime.Now:HH:mm:ss.fff}: {cmd}");
+                        splashScreenWindow.StartProgressTimer();
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        LogToFile($"Emulator plugin not found for game type: {game.EmulatorPlugin} at {DateTime.Now:HH:mm:ss.fff}");
-                        throw new Exception($"Emulator plugin not found: {game.EmulatorPlugin}");
+                        LogToFile($"Error starting progress timer after T1 fade-in at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
                     }
-                }
+                };
             }
             catch (Exception ex)
             {
@@ -737,8 +877,15 @@ namespace ArcadeLauncher.SW3
                 Focus();
 
                 var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-                SetForegroundWindow(handle);
-                LogToFile($"Game selection screen restored (after launch failure) and set to foreground window with handle: {handle} at {DateTime.Now:HH:mm:ss.fff}");
+                try
+                {
+                    SetForegroundWindow(handle);
+                    LogToFile($"Game selection screen restored (after launch failure) and set to foreground window with handle: {handle} at {DateTime.Now:HH:mm:ss.fff}");
+                }
+                catch (Exception ex2)
+                {
+                    LogToFile($"Error setting foreground window after launch failure at {DateTime.Now:HH:mm:ss.fff}: {ex2.Message}");
+                }
 
                 StartFocusRestorationLoop();
             }
