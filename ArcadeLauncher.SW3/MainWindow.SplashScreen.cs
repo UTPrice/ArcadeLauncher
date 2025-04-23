@@ -572,7 +572,8 @@ namespace ArcadeLauncher.SW3
                                 {
                                     From = 1.0,
                                     To = 0.0,
-                                    Duration = TimeSpan.FromSeconds(FadeOutDurationT2)
+                                    Duration = TimeSpan.FromSeconds(FadeOutDurationT2),
+                                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
                                 };
                                 fadeOutAnimation.Completed += (s, e) =>
                                 {
@@ -589,7 +590,7 @@ namespace ArcadeLauncher.SW3
                                 try
                                 {
                                     this.BeginAnimation(OpacityProperty, fadeOutAnimation);
-                                    parentWindow.LogToFile($"Starting fade-out for launch phase (Transition 2) at {DateTime.Now:HH:mm:ss.fff}.");
+                                    parentWindow.LogToFile($"Starting fade-out for launch phase (Transition 2) with SineEase (EaseOut) at {DateTime.Now:HH:mm:ss.fff}.");
                                 }
                                 catch (Exception ex)
                                 {
@@ -701,7 +702,7 @@ namespace ArcadeLauncher.SW3
                 if (!hasLoggedPositions)
                 {
                     parentWindow.LogToFile($"Bar Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: barY={barY * dpiScaleFactor}, barHeight={barHeight}, BottomEdge={(barY + barHeight / dpiScaleFactor) * dpiScaleFactor}, ScreenHeightPhysical={screenHeightPhysical}");
-                    parentWindow.LogToFile($"Progress Meter Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: progressX={textX * dpiScaleFactor}, progressY={textY * dpiScaleFactor}, progressDiameter={progressDiameter}, baseShadowArcCenterDiameter={baseArcCenterDiameter * dpiScaleFactor}, baseShadowArcThickness={shadowArcThickness * dpiScaleFactor}");
+                    parentWindow.LogToFile($"Progress Meter Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: progressX={textX * dpiScaleFactor}, textY={textY * dpiScaleFactor}, progressDiameter={progressDiameter}, baseShadowArcCenterDiameter={baseArcCenterDiameter * dpiScaleFactor}, baseShadowArcThickness={shadowArcThickness * dpiScaleFactor}");
                     hasLoggedPositions = true;
                 }
             }
