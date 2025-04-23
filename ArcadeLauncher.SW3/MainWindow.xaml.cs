@@ -88,6 +88,9 @@ namespace ArcadeLauncher.SW3
             // Initialize game logic
             InitializeGameLogic();
 
+            // Initialize XInput
+            InitializeXInput();
+
             // Add focus event handlers for diagnostic logging
             Activated += (s, e) => LogToFile("MainWindow activated.");
             Deactivated += (s, e) =>
@@ -214,9 +217,6 @@ namespace ArcadeLauncher.SW3
                     {
                         LogToFile("gameItemsControl is null");
                     }
-
-                    // Log the actual widths after layout
-                    LogToFile($"After Layout - Canvas.ActualWidth: {canvas.ActualWidth}, MarginBorder.ActualWidth: {marginBorder?.ActualWidth ?? 0}, ScrollViewer.ActualWidth: {scrollViewer.ActualWidth}, ItemsControl.ActualWidth: {gameItemsControl?.ActualWidth ?? 0}");
 
                     // Log the positions of the first row's art boxes to verify gaps
                     if (gameItemsControl != null && gameItemsControl.Items.Count >= settings.NumberOfColumns)
@@ -738,6 +738,8 @@ namespace ArcadeLauncher.SW3
             marqueeWindow?.Close();
             controllerWindow?.Close();
             LogToFile("Closed secondary windows on application shutdown.");
+            // Shutdown XInput
+            ShutdownXInput();
         }
     }
 }
