@@ -26,6 +26,7 @@ namespace ArcadeLauncher.SW3
         private const float T1FadeOutDuration = 0.8f;
         private const float T1FadeInDuration = 0.8f;
         private const float T1OverlapPercentage = 0.98f;
+        private DispatcherTimer? focusTimer; // Track focus timer to stop existing ones
 
         private delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
         private const int WH_KEYBOARD_LL = 13;
@@ -80,6 +81,42 @@ namespace ArcadeLauncher.SW3
                     LogToFile("Keyboard hook successfully set.");
                 }
             }
+
+            // Ensure secondary windows are closed on application shutdown
+            Closing += (s, e) =>
+            {
+                try
+                {
+                    if (marqueeWindow != null)
+                    {
+                        marqueeWindow.Close();
+                        LogToFile($"Closed marqueeWindow on MainWindow closing at {DateTime.Now:HH:mm:ss.fff}.");
+                        marqueeWindow = null;
+                    }
+                    if (controllerWindow != null)
+                    {
+                        controllerWindow.Close();
+                        LogToFile($"Closed controllerWindow on MainWindow closing at {DateTime.Now:HH:mm:ss.fff}.");
+                        controllerWindow = null;
+                    }
+                    if (splashScreenWindow != null)
+                    {
+                        splashScreenWindow.Close();
+                        LogToFile($"Closed splashScreenWindow on MainWindow closing at {DateTime.Now:HH:mm:ss.fff}.");
+                        splashScreenWindow = null;
+                    }
+                    if (hookId != IntPtr.Zero)
+                    {
+                        UnhookWindowsHookEx(hookId);
+                        LogToFile($"Unhooked keyboard hook on MainWindow closing at {DateTime.Now:HH:mm:ss.fff}.");
+                        hookId = IntPtr.Zero;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogToFile($"Error during MainWindow closing cleanup at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                }
+            };
         }
 
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -186,45 +223,61 @@ namespace ArcadeLauncher.SW3
                             LogToFile($"Failed to terminate process tree at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
                         }
 
+                        // Close existing SplashScreenWindow and nullify
                         if (splashScreenWindow != null)
                         {
-                            splashScreenWindow.Close();
-                            LogToFile($"Closed existing SplashScreenWindow before T3 at {DateTime.Now:HH:mm:ss.fff}.");
+                            try
+                            {
+                                splashScreenWindow.Close();
+                                Dispatcher.Invoke(() => { }, DispatcherPriority.Render); // Ensure closure is processed
+                                LogToFile($"Closed existing SplashScreenWindow before T3 at {DateTime.Now:HH:mm:ss.fff}.");
+                            }
+                            catch (Exception ex)
+                            {
+                                LogToFile($"Error closing SplashScreenWindow before T3 at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                            }
                             splashScreenWindow = null;
                         }
 
                         splashScreenWindow = new SplashScreenWindow(this, game, dpiScaleFactor, () =>
                         {
-                            if (marqueeWindow != null && marqueeWindow.Content is Grid marqueeGrid)
+                            try
                             {
-                                string marqueeDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_marquee.png");
-                                FadeImage(marqueeGrid, new BitmapImage(new Uri(marqueeDefaultPath, UriKind.Absolute)));
+                                if (marqueeWindow != null && marqueeWindow.Content is Grid marqueeGrid)
+                                {
+                                    string marqueeDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_marquee.png");
+                                    FadeImage(marqueeGrid, new BitmapImage(new Uri(marqueeDefaultPath, UriKind.Absolute)));
+                                }
+                                if (controllerWindow != null && controllerWindow.Content is Grid controllerGrid)
+                                {
+                                    string controllerDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_controller.png");
+                                    FadeImage(controllerGrid, new BitmapImage(new Uri(controllerDefaultPath, UriKind.Absolute)));
+                                }
+
+                                foreach (var cmd in game.PostExitCommands ?? new List<string>())
+                                {
+                                    RunCommand(cmd, "Post-Exit Command");
+                                }
+
+                                var screenWidthLogicalPostExit = SystemParameters.PrimaryScreenWidth;
+                                var screenHeightLogicalPostExit = SystemParameters.PrimaryScreenHeight;
+                                var screenWidthPhysicalPostExit = (int)(screenWidthLogicalPostExit * dpiScaleFactor);
+                                var screenHeightPhysicalPostExit = (int)(screenHeightLogicalPostExit * dpiScaleFactor);
+                                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysicalPostExit - 1, screenHeightPhysicalPostExit - 1);
+                                LogToFile($"Restored mouse cursor after exit at {DateTime.Now:HH:mm:ss.fff}: Moved to bottom-right pixel (physical): ({screenWidthPhysicalPostExit - 1}, {screenHeightPhysicalPostExit - 1})");
+
+                                activeProcess = null;
+                                isGameActive = false;
                             }
-                            if (controllerWindow != null && controllerWindow.Content is Grid controllerGrid)
+                            catch (Exception ex)
                             {
-                                string controllerDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_controller.png");
-                                FadeImage(controllerGrid, new BitmapImage(new Uri(controllerDefaultPath, UriKind.Absolute)));
+                                LogToFile($"Error in onComplete callback at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
                             }
-
-                            foreach (var cmd in game.PostExitCommands ?? new List<string>())
-                            {
-                                RunCommand(cmd, "Post-Exit Command");
-                            }
-
-                            var screenWidthLogicalPostExit = SystemParameters.PrimaryScreenWidth;
-                            var screenHeightLogicalPostExit = SystemParameters.PrimaryScreenHeight;
-                            var screenWidthPhysicalPostExit = (int)(screenWidthLogicalPostExit * dpiScaleFactor);
-                            var screenHeightPhysicalPostExit = (int)(screenHeightLogicalPostExit * dpiScaleFactor);
-                            System.Windows.Forms.Cursor.Position = new System.Drawing.Point(screenWidthPhysicalPostExit - 1, screenHeightPhysicalPostExit - 1);
-                            LogToFile($"Restored mouse cursor after exit at {DateTime.Now:HH:mm:ss.fff}: Moved to bottom-right pixel (physical): ({screenWidthPhysicalPostExit - 1}, {screenHeightPhysicalPostExit - 1})");
-
-                            activeProcess = null;
-                            isGameActive = false;
                         }, isLaunchPhase: false, startFadeTimer: false);
 
                         Visibility = Visibility.Hidden;
                         Opacity = 0;
-                        LogToFile($"MainWindow hidden for T3 black background at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}");
+                        LogToFile($"MainWindow hidden for T3 black background at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}, IsLoaded: {IsLoaded}");
 
                         splashScreenWindow.Opacity = 0;
                         splashScreenWindow.Visibility = Visibility.Visible;
@@ -247,7 +300,15 @@ namespace ArcadeLauncher.SW3
 
                         splashScreenWindow.StartFadeAnimation();
 
-                        var focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+                        // Stop any existing focus timer
+                        if (focusTimer != null)
+                        {
+                            focusTimer.Stop();
+                            LogToFile($"Stopped existing T3 focus timer at {DateTime.Now:HH:mm:ss.fff}.");
+                            focusTimer = null;
+                        }
+
+                        focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
                         int focusAttempts = 0;
                         focusTimer.Tick += (s, e) =>
                         {
@@ -268,6 +329,7 @@ namespace ArcadeLauncher.SW3
                             if (focusAttempts >= 20)
                             {
                                 focusTimer.Stop();
+                                focusTimer = null;
                                 LogToFile($"T3 focus loop stopped at {DateTime.Now:HH:mm:ss.fff} after {focusAttempts} attempts.");
                             }
                         };
@@ -641,10 +703,19 @@ namespace ArcadeLauncher.SW3
                     RunCommand(game.LEDBlinkyCommand, "LEDBlinky Command");
                 }
 
+                // Close existing SplashScreenWindow and nullify
                 if (splashScreenWindow != null)
                 {
-                    splashScreenWindow.Close();
-                    LogToFile($"Closed existing SplashScreenWindow before new launch at {DateTime.Now:HH:mm:ss.fff}.");
+                    try
+                    {
+                        splashScreenWindow.Close();
+                        Dispatcher.Invoke(() => { }, DispatcherPriority.Render); // Ensure closure is processed
+                        LogToFile($"Closed existing SplashScreenWindow before new launch at {DateTime.Now:HH:mm:ss.fff}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToFile($"Error closing SplashScreenWindow before new launch at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                    }
                     splashScreenWindow = null;
                 }
 
@@ -657,8 +728,16 @@ namespace ArcadeLauncher.SW3
                     }
                     if (splashScreenWindow != null)
                     {
-                        splashScreenWindow.Close();
-                        LogToFile($"Closed SplashScreenWindow in onComplete at {DateTime.Now:HH:mm:ss.fff}.");
+                        try
+                        {
+                            splashScreenWindow.Close();
+                            Dispatcher.Invoke(() => { }, DispatcherPriority.Render); // Ensure closure is processed
+                            LogToFile($"Closed SplashScreenWindow in onComplete at {DateTime.Now:HH:mm:ss.fff}.");
+                        }
+                        catch (Exception ex)
+                        {
+                            LogToFile($"Error closing SplashScreenWindow in onComplete at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                        }
                         splashScreenWindow = null;
                     }
                 }, isLaunchPhase: true, startFadeTimer: false);
@@ -672,7 +751,7 @@ namespace ArcadeLauncher.SW3
                     EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
                 };
 
-                // T1 Fade-In: SplashScreenWindow fades in with SineEase over 0.8s, starting at 90% of fade-out
+                // T1 Fade-In: SplashScreenWindow fades in with SineEase over 0.8s, starting at 98% of fade-out
                 var fadeInAnimation = new DoubleAnimation
                 {
                     From = 0.0,
@@ -685,7 +764,7 @@ namespace ArcadeLauncher.SW3
                 var fadeOutTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
                 fadeOutTimer.Tick += (s, e) =>
                 {
-                    LogToFile($"T1 MainWindow fade-out opacity update at {DateTime.Now:HH:mm:ss.fff}: Opacity={Opacity}");
+                    LogToFile($"T1 MainWindow fade-out opacity update at {DateTime.Now:HH:mm:ss.fff}: Opacity={Opacity}, Visibility={Visibility}, IsLoaded={IsLoaded}");
                 };
 
                 // Start fade-out after a brief delay to ensure rendering
@@ -693,7 +772,7 @@ namespace ArcadeLauncher.SW3
                 startDelayTimer.Tick += (s, e) =>
                 {
                     startDelayTimer.Stop();
-                    LogToFile($"Starting T1 MainWindow fade-out (SineEase, EaseOut, {T1FadeOutDuration}s) at {DateTime.Now:HH:mm:ss.fff}.");
+                    LogToFile($"Starting T1 MainWindow fade-out (SineEase, EaseOut, {T1FadeOutDuration}s) at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}, IsLoaded: {IsLoaded}");
                     try
                     {
                         fadeOutTimer.Start();
@@ -706,7 +785,7 @@ namespace ArcadeLauncher.SW3
                 };
                 startDelayTimer.Start();
 
-                // Start fade-in at 90% of fade-out duration (0.8s * 0.9 = 0.72s)
+                // Start fade-in at 98% of fade-out duration (0.8s * 0.98 = 0.784s)
                 var overlapTimer = new DispatcherTimer
                 {
                     Interval = TimeSpan.FromSeconds(T1FadeOutDuration * T1OverlapPercentage)
@@ -740,7 +819,7 @@ namespace ArcadeLauncher.SW3
                 {
                     fadeOutTimer.Stop();
                     Visibility = Visibility.Hidden;
-                    LogToFile($"T1 MainWindow fade-out completed at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}");
+                    LogToFile($"T1 MainWindow fade-out completed at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}, IsLoaded: {IsLoaded}");
 
                     // Update marquee and controller images after fade-out
                     if (marqueeWindow != null && marqueeWindow.Content is Grid marqueeGrid)

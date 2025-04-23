@@ -42,6 +42,10 @@ namespace ArcadeLauncher.SW3
         private const int ProgressDurationMs = 3000;
         private const int ProgressUpdateIntervalMs = 30;
         private const int FadeUpdateIntervalMs = 50;
+        private const float T4FadeOutDuration = 0.8f;
+        private const float T4FadeInDuration = 0.8f;
+        private const float T4OverlapPercentage = 0.98f;
+        private const int T4FallbackTimeoutMs = 5000;
 
         private class SplashScreenWindow : Window
         {
@@ -73,6 +77,10 @@ namespace ArcadeLauncher.SW3
 
             private DispatcherTimer fadeTimer;
             private DispatcherTimer progressTimer;
+            private DispatcherTimer fadeOutTimer;
+            private DispatcherTimer fadeInTimer;
+            private DispatcherTimer overlapTimer;
+            private DispatcherTimer t4FallbackTimer;
             private Action onComplete;
             private readonly bool startFadeTimerOnConstruction;
 
@@ -206,7 +214,25 @@ namespace ArcadeLauncher.SW3
                 {
                     fadeTimer?.Stop();
                     progressTimer?.Stop();
-                    parentWindow.LogToFile($"SplashScreenWindow closing at {DateTime.Now:HH:mm:ss.fff}. Timers stopped.");
+                    fadeOutTimer?.Stop();
+                    fadeInTimer?.Stop();
+                    overlapTimer?.Stop();
+                    t4FallbackTimer?.Stop();
+                    BeginAnimation(OpacityProperty, null); // Clear animations
+                    parentWindow.LogToFile($"SplashScreenWindow closing at {DateTime.Now:HH:mm:ss.fff}. Timers stopped and animations cleared. Visibility: {Visibility}, Opacity: {Opacity}");
+                    // Attempt to restore MainWindow if not in launch phase
+                    if (!isLaunchPhase && parentWindow != null && parentWindow.IsLoaded)
+                    {
+                        parentWindow.Dispatcher.Invoke(() =>
+                        {
+                            parentWindow.Visibility = Visibility.Visible;
+                            parentWindow.Opacity = 1;
+                            parentWindow.Topmost = true;
+                            parentWindow.Activate();
+                            parentWindow.Focus();
+                            parentWindow.LogToFile($"MainWindow restored on SplashScreenWindow closing at {DateTime.Now:HH:mm:ss.fff}. Visibility: {parentWindow.Visibility}, Opacity: {parentWindow.Opacity}, IsLoaded: {parentWindow.IsLoaded}");
+                        });
+                    }
                 };
             }
 
@@ -221,14 +247,40 @@ namespace ArcadeLauncher.SW3
 
             public void StartProgressTimer()
             {
-                parentWindow.LogToFile($"Starting progressTimer for T1 at {DateTime.Now:HH:mm:ss.fff}.");
+                parentWindow.LogToFile($"Starting progressTimer for {(isLaunchPhase ? "T1" : "T3")} at {DateTime.Now:HH:mm:ss.fff}.");
                 progressTimer.Start();
+                if (!isLaunchPhase)
+                {
+                    // Start fallback timer to restore MainWindow if T4 doesn't start
+                    t4FallbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(T4FallbackTimeoutMs) };
+                    t4FallbackTimer.Tick += (s, e) =>
+                    {
+                        t4FallbackTimer.Stop();
+                        parentWindow.LogToFile($"T4 fallback timer triggered at {DateTime.Now:HH:mm:ss.fff}. ProgressValue={progressValue}%. Restoring MainWindow.");
+                        if (parentWindow != null && parentWindow.IsLoaded)
+                        {
+                            parentWindow.Dispatcher.Invoke(() =>
+                            {
+                                parentWindow.Visibility = Visibility.Visible;
+                                parentWindow.Opacity = 1;
+                                parentWindow.Topmost = true;
+                                parentWindow.Activate();
+                                parentWindow.Focus();
+                                parentWindow.LogToFile($"MainWindow restored via T4 fallback at {DateTime.Now:HH:mm:ss.fff}. Visibility: {parentWindow.Visibility}, Opacity: {parentWindow.Opacity}, IsLoaded: {parentWindow.IsLoaded}");
+                            });
+                        }
+                        Close();
+                    };
+                    t4FallbackTimer.Start();
+                    parentWindow.LogToFile($"T4 fallback timer started at {DateTime.Now:HH:mm:ss.fff}.");
+                }
             }
 
             public void StartFadeAnimation()
             {
-                parentWindow.LogToFile($"Starting T3 fade-in animation with SineEase (EaseIn) at {DateTime.Now:HH:mm:ss.fff}. Initial Opacity: {Opacity}, Visibility: {Visibility}");
+                // Clear any existing animations
                 BeginAnimation(OpacityProperty, null);
+                parentWindow.LogToFile($"Starting T3 fade-in animation with SineEase (EaseIn) at {DateTime.Now:HH:mm:ss.fff}. Initial Opacity: {Opacity}, Visibility: {Visibility}");
                 var fadeInAnimation = new DoubleAnimation
                 {
                     From = 0.0,
@@ -244,14 +296,28 @@ namespace ArcadeLauncher.SW3
                 fadeInAnimation.Completed += (s, e) =>
                 {
                     parentWindow.LogToFile($"T3 fade-in animation completed at {DateTime.Now:HH:mm:ss.fff}. Final Opacity: {Opacity}, Visibility: {Visibility}");
-                    progressTimer.Start();
-                    parentWindow.LogToFile($"ProgressTimer started for T3 at {DateTime.Now:HH:mm:ss.fff}.");
+                    try
+                    {
+                        progressTimer.Start();
+                        parentWindow.LogToFile($"ProgressTimer started for T3 at {DateTime.Now:HH:mm:ss.fff}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        parentWindow.LogToFile($"Error starting ProgressTimer for T3 at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                    }
                     opacityTimer.Stop();
                     parentWindow.LogToFile($"T3 opacity timer stopped at {DateTime.Now:HH:mm:ss.fff}.");
                 };
                 Opacity = 0;
-                BeginAnimation(OpacityProperty, fadeInAnimation);
-                opacityTimer.Start();
+                try
+                {
+                    BeginAnimation(OpacityProperty, fadeInAnimation);
+                    opacityTimer.Start();
+                }
+                catch (Exception ex)
+                {
+                    parentWindow.LogToFile($"Error starting T3 fade-in animation at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                }
             }
 
             private void LoadSplashImage()
@@ -337,7 +403,14 @@ namespace ArcadeLauncher.SW3
                         currentOpacity = 0;
                         fadeTimer.Stop();
                         parentWindow.LogToFile($"SplashScreenWindow fade-out complete at {DateTime.Now:HH:mm:ss.fff}, invoking onComplete.");
-                        onComplete?.Invoke();
+                        try
+                        {
+                            onComplete?.Invoke();
+                        }
+                        catch (Exception ex)
+                        {
+                            parentWindow.LogToFile($"Error invoking onComplete at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                        }
                         Close();
                     }
                 }
@@ -348,63 +421,192 @@ namespace ArcadeLauncher.SW3
 
             private void ProgressTimer_Tick()
             {
-                progressValue++;
-                if (progressValue >= 100)
+                try
                 {
-                    progressValue = 100;
-                    progressTimer.Stop();
-                    if (!isLaunchPhase)
+                    progressValue++;
+                    if (progressValue % 10 == 0 || progressValue == 100)
                     {
-                        parentWindow.Dispatcher.Invoke(() =>
-                        {
-                            parentWindow.Visibility = Visibility.Visible;
-                            parentWindow.Topmost = true;
-                            parentWindow.Activate();
-                            parentWindow.Focus();
-                            parentWindow.LogToFile($"MainWindow made visible and focused before splash screen fade-out (exit phase) at {DateTime.Now:HH:mm:ss.fff}.");
-
-                            var fadeOutAnimation = new DoubleAnimation
-                            {
-                                From = 1.0,
-                                To = 0.0,
-                                Duration = TimeSpan.FromSeconds(FadeOutDurationSeconds)
-                            };
-                            var fadeInAnimation = new DoubleAnimation
-                            {
-                                From = 0.0,
-                                To = 1.0,
-                                Duration = TimeSpan.FromSeconds(FadeOutDurationSeconds)
-                            };
-
-                            this.BeginAnimation(OpacityProperty, fadeOutAnimation);
-                            parentWindow.BeginAnimation(OpacityProperty, fadeInAnimation);
-
-                            isFadingOut = true;
-                            currentOpacity = 1;
-                            parentWindow.LogToFile($"Starting T3 cross-fade at {DateTime.Now:HH:mm:ss.fff}: SplashScreenWindow fade-out, MainWindow fade-in for exit phase.");
-                        });
+                        parentWindow.LogToFile($"ProgressTimer_Tick at {DateTime.Now:HH:mm:ss.fff}: ProgressValue={progressValue}%, isLaunchPhase={isLaunchPhase}, SplashScreenWindow Visibility={Visibility}, Opacity={Opacity}");
                     }
-                    else
+
+                    if (progressValue >= 100)
                     {
-                        parentWindow.Dispatcher.Invoke(() =>
+                        progressValue = 100;
+                        progressTimer.Stop();
+                        t4FallbackTimer?.Stop();
+                        parentWindow.LogToFile($"ProgressTimer stopped at {DateTime.Now:HH:mm:ss.fff}: ProgressValue={progressValue}%. Initiating {(isLaunchPhase ? "T2" : "T4")}.");
+
+                        if (!isLaunchPhase)
                         {
-                            var fadeOutAnimation = new DoubleAnimation
+                            parentWindow.Dispatcher.Invoke(() =>
                             {
-                                From = 1.0,
-                                To = 0.0,
-                                Duration = TimeSpan.FromSeconds(FadeOutDurationT2)
-                            };
-                            fadeOutAnimation.Completed += (s, e) =>
+                                parentWindow.LogToFile($"Preparing T4 at {DateTime.Now:HH:mm:ss.fff}: MainWindow IsLoaded={parentWindow?.IsLoaded}, Visibility={parentWindow?.Visibility}, Opacity={parentWindow?.Opacity}, SplashScreenWindow Visibility={Visibility}, Opacity={Opacity}");
+
+                                if (parentWindow == null || !parentWindow.IsLoaded)
+                                {
+                                    parentWindow?.LogToFile($"T4 aborted: MainWindow is null or not loaded at {DateTime.Now:HH:mm:ss.fff}. Closing SplashScreenWindow.");
+                                    Close();
+                                    return;
+                                }
+
+                                // Ensure SplashScreenWindow is visible, topmost, and rendered
+                                Visibility = Visibility.Visible;
+                                Opacity = 1.0;
+                                Topmost = true;
+                                parentWindow.Topmost = false; // Ensure MainWindow is behind during T4A
+                                Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+                                parentWindow.LogToFile($"T4 SplashScreenWindow state set at {DateTime.Now:HH:mm:ss.fff}: Visibility={Visibility}, Opacity={Opacity}, Topmost={Topmost}, Render forced.");
+
+                                // Clear any existing animations
+                                BeginAnimation(OpacityProperty, null);
+
+                                // T4A: SplashScreenWindow fade-out with SineEase (EaseOut) over 0.8s
+                                fadeOutTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+                                var fadeOutAnimation = new DoubleAnimation
+                                {
+                                    From = 1.0,
+                                    To = 0.0,
+                                    Duration = TimeSpan.FromSeconds(T4FadeOutDuration),
+                                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
+                                };
+
+                                // T4B: MainWindow fade-in with SineEase (EaseIn) over 0.8s, starting at 98% of fade-out
+                                parentWindow.Opacity = 0;
+                                parentWindow.Visibility = Visibility.Visible;
+                                fadeInTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+                                var fadeInAnimation = new DoubleAnimation
+                                {
+                                    From = 0.0,
+                                    To = 1.0,
+                                    Duration = TimeSpan.FromSeconds(T4FadeInDuration),
+                                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn }
+                                };
+
+                                // Log opacity updates for T4A fade-out
+                                fadeOutTimer.Tick += (s, e) =>
+                                {
+                                    parentWindow.LogToFile($"T4 SplashScreenWindow fade-out opacity update at {DateTime.Now:HH:mm:ss.fff}: Opacity={Opacity}, Visibility={Visibility}");
+                                };
+
+                                // Log opacity updates for T4B fade-in
+                                fadeInTimer.Tick += (s, e) =>
+                                {
+                                    parentWindow.LogToFile($"T4 MainWindow fade-in opacity update at {DateTime.Now:HH:mm:ss.fff}: Opacity={parentWindow.Opacity}, Visibility={parentWindow.Visibility}, IsLoaded={parentWindow.IsLoaded}");
+                                };
+
+                                // Start T4A fade-out
+                                parentWindow.LogToFile($"Starting T4 SplashScreenWindow fade-out (SineEase, EaseOut, {T4FadeOutDuration}s) at {DateTime.Now:HH:mm:ss.fff}.");
+                                try
+                                {
+                                    fadeOutTimer.Start();
+                                    BeginAnimation(OpacityProperty, fadeOutAnimation);
+                                }
+                                catch (Exception ex)
+                                {
+                                    parentWindow.LogToFile($"Error starting T4 SplashScreenWindow fade-out at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                                    Close();
+                                }
+
+                                // Start T4B fade-in at 98% of fade-out duration (0.8s * 0.98 = 0.784s)
+                                overlapTimer = new DispatcherTimer
+                                {
+                                    Interval = TimeSpan.FromSeconds(T4FadeOutDuration * T4OverlapPercentage)
+                                };
+                                overlapTimer.Tick += (s, e) =>
+                                {
+                                    overlapTimer.Stop();
+                                    try
+                                    {
+                                        parentWindow.Topmost = true;
+                                        parentWindow.Activate();
+                                        parentWindow.Focus();
+                                        parentWindow.LogToFile($"Starting T4 MainWindow fade-in (SineEase, {T4FadeInDuration}s) at {DateTime.Now:HH:mm:ss.fff}. Visibility: {parentWindow.Visibility}, Opacity: {parentWindow.Opacity}, Overlap: {T4OverlapPercentage}, IsLoaded: {parentWindow.IsLoaded}");
+                                        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+                                        parentWindow.LogToFile($"MainWindow render forced for T4 fade-in at {DateTime.Now:HH:mm:ss.fff}.");
+                                        fadeInTimer.Start();
+                                        parentWindow.BeginAnimation(OpacityProperty, fadeInAnimation);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        parentWindow.LogToFile($"Error starting T4 MainWindow fade-in at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                                        Close();
+                                    }
+                                };
+                                overlapTimer.Start();
+
+                                // Finalize T4A fade-out
+                                fadeOutAnimation.Completed += (s, e) =>
+                                {
+                                    fadeOutTimer.Stop();
+                                    Visibility = Visibility.Hidden;
+                                    parentWindow.LogToFile($"T4 SplashScreenWindow fade-out completed at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}");
+                                };
+
+                                // Finalize T4B fade-in and cleanup
+                                fadeInAnimation.Completed += (s, e) =>
+                                {
+                                    fadeInTimer.Stop();
+                                    parentWindow.LogToFile($"T4 MainWindow fade-in completed at {DateTime.Now:HH:mm:ss.fff}. Visibility: {parentWindow.Visibility}, Opacity: {parentWindow.Opacity}, IsLoaded: {parentWindow.IsLoaded}");
+                                    try
+                                    {
+                                        parentWindow.Topmost = true;
+                                        parentWindow.Activate();
+                                        parentWindow.Focus();
+                                        parentWindow.LogToFile($"MainWindow made visible and focused after T4 at {DateTime.Now:HH:mm:ss.fff}.");
+                                        Close();
+                                        parentWindow.LogToFile($"SplashScreenWindow closed after T4 at {DateTime.Now:HH:mm:ss.fff}.");
+                                        onComplete?.Invoke();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        parentWindow.LogToFile($"Error finalizing T4 at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                                    }
+                                };
+                            });
+                        }
+                        else
+                        {
+                            parentWindow.Dispatcher.Invoke(() =>
                             {
-                                parentWindow.LogToFile($"SplashScreenWindow fade-out complete for launch phase (Transition 2) at {DateTime.Now:HH:mm:ss.fff}.");
-                                onComplete?.Invoke();
-                            };
-                            this.BeginAnimation(OpacityProperty, fadeOutAnimation);
-                            parentWindow.LogToFile($"Starting fade-out for launch phase (Transition 2) at {DateTime.Now:HH:mm:ss.fff}.");
-                        });
+                                var fadeOutAnimation = new DoubleAnimation
+                                {
+                                    From = 1.0,
+                                    To = 0.0,
+                                    Duration = TimeSpan.FromSeconds(FadeOutDurationT2)
+                                };
+                                fadeOutAnimation.Completed += (s, e) =>
+                                {
+                                    parentWindow.LogToFile($"SplashScreenWindow fade-out complete for launch phase (Transition 2) at {DateTime.Now:HH:mm:ss.fff}.");
+                                    try
+                                    {
+                                        onComplete?.Invoke();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        parentWindow.LogToFile($"Error invoking onComplete for T2 at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                                    }
+                                };
+                                try
+                                {
+                                    this.BeginAnimation(OpacityProperty, fadeOutAnimation);
+                                    parentWindow.LogToFile($"Starting fade-out for launch phase (Transition 2) at {DateTime.Now:HH:mm:ss.fff}.");
+                                }
+                                catch (Exception ex)
+                                {
+                                    parentWindow.LogToFile($"Error starting T2 fade-out at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                                }
+                            });
+                        }
                     }
+                    UpdateUI();
                 }
-                UpdateUI();
+                catch (Exception ex)
+                {
+                    parentWindow.LogToFile($"Error in ProgressTimer_Tick at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                    progressTimer.Stop();
+                    t4FallbackTimer?.Stop();
+                    Close();
+                }
             }
 
             private void UpdateUI()
@@ -499,7 +701,7 @@ namespace ArcadeLauncher.SW3
                 if (!hasLoggedPositions)
                 {
                     parentWindow.LogToFile($"Bar Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: barY={barY * dpiScaleFactor}, barHeight={barHeight}, BottomEdge={(barY + barHeight / dpiScaleFactor) * dpiScaleFactor}, ScreenHeightPhysical={screenHeightPhysical}");
-                    parentWindow.LogToFile($"Progress Meter Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: progressX={progressX * dpiScaleFactor}, progressY={progressY * dpiScaleFactor}, progressDiameter={progressDiameter}, baseShadowArcCenterDiameter={baseArcCenterDiameter * dpiScaleFactor}, baseShadowArcThickness={shadowArcThickness * dpiScaleFactor}");
+                    parentWindow.LogToFile($"Progress Meter Position (Physical Pixels) at {DateTime.Now:HH:mm:ss.fff}: progressX={textX * dpiScaleFactor}, progressY={textY * dpiScaleFactor}, progressDiameter={progressDiameter}, baseShadowArcCenterDiameter={baseArcCenterDiameter * dpiScaleFactor}, baseShadowArcThickness={shadowArcThickness * dpiScaleFactor}");
                     hasLoggedPositions = true;
                 }
             }
