@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -553,6 +554,12 @@ namespace ArcadeLauncher.SW3
                                         parentWindow.Activate();
                                         parentWindow.Focus();
                                         parentWindow.LogToFile($"MainWindow made visible and focused after T4 at {DateTime.Now:HH:mm:ss.fff}.");
+                                        // Resume XInput polling after T4
+                                        if (parentWindow.xInputTimer != null)
+                                        {
+                                            parentWindow.xInputTimer.Start();
+                                            parentWindow.LogToFile($"XInput polling started after T4 at {DateTime.Now:HH:mm:ss.fff}.");
+                                        }
                                         Close();
                                         parentWindow.LogToFile($"SplashScreenWindow closed after T4 at {DateTime.Now:HH:mm:ss.fff}.");
                                         onComplete?.Invoke();

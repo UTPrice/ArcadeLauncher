@@ -27,6 +27,7 @@ namespace ArcadeLauncher.SW3
         private const float T1FadeInDuration = 0.8f;
         private const float T1OverlapPercentage = 0.98f;
         private DispatcherTimer? focusTimer; // Track focus timer to stop existing ones
+        private DispatcherTimer inputTimer; // Timer for XInput processing
 
         private delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
         private const int WH_KEYBOARD_LL = 13;
@@ -82,7 +83,16 @@ namespace ArcadeLauncher.SW3
                 }
             }
 
-            // Ensure secondary windows are closed on application shutdown
+            // Initialize input timer for XInput processing
+            inputTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(8) // 125Hz (8ms), sync with XInput polling
+            };
+            inputTimer.Tick += InputTimer_Tick;
+            inputTimer.Start();
+            LogToFile("Input timer started for XInput processing at 8ms interval (125Hz).");
+
+            // Ensure secondary windows and input are closed on application shutdown
             Closing += (s, e) =>
             {
                 try
@@ -111,12 +121,83 @@ namespace ArcadeLauncher.SW3
                         LogToFile($"Unhooked keyboard hook on MainWindow closing at {DateTime.Now:HH:mm:ss.fff}.");
                         hookId = IntPtr.Zero;
                     }
+                    if (inputTimer != null)
+                    {
+                        inputTimer.Stop();
+                        inputTimer.Tick -= InputTimer_Tick;
+                        LogToFile($"Stopped input timer on MainWindow closing at {DateTime.Now:HH:mm:ss.fff}.");
+                    }
                 }
                 catch (Exception ex)
                 {
                     LogToFile($"Error during MainWindow closing cleanup at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
                 }
             };
+        }
+
+        private void InputTimer_Tick(object sender, EventArgs e)
+        {
+            if (isGameActive) return; // Skip input processing during game play
+
+            var actions = GetXInputActions();
+            var activeDirections = new HashSet<string>();
+
+            if (actions.Count == 0)
+            {
+                // Log when no actions are processed to debug ignored inputs
+                var state = new XINPUT_STATE();
+                if (XInputGetState(0, ref state) == ERROR_SUCCESS)
+                {
+                    short lx = state.Gamepad.sThumbLX;
+                    short ly = state.Gamepad.sThumbLY;
+                    var inputs = (Up: ly > StickThreshold, Down: ly < -StickThreshold, Left: lx < -StickThreshold, Right: lx > StickThreshold);
+                    if (inputs.Up || inputs.Down || inputs.Left || inputs.Right)
+                    {
+                        var startTimes = pressStartTimes[0];
+                        var moveTimes = lastMoveTimes[0];
+                        LogToFile($"[XInput] Controller 0: Input ignored (sThumbLX={lx}, sThumbLY={ly}, " +
+                        $"StartTimes: Up={startTimes.Up:HH:mm:ss.fff}, Down={startTimes.Down:HH:mm:ss.fff}, " +
+                        $"Left={startTimes.Left:HH:mm:ss.fff}, Right={startTimes.Right:HH:mm:ss.fff}, " +
+                        $"MoveTimes: Up={moveTimes.Up:HH:mm:ss.fff}, Down={moveTimes.Down:HH:mm:ss.fff}, " +
+                        $"Left={moveTimes.Left:HH:mm:ss.fff}, Right={moveTimes.Right:HH:mm:ss.fff}) at {DateTime.Now:HH:mm:ss.fff}");
+                    }
+                }
+            }
+
+            foreach (var (controller, action, isSingle) in actions)
+            {
+                activeDirections.Add(action);
+                int delta = action switch
+                {
+                    "Up" => -settings.NumberOfColumns,
+                    "Down" => settings.NumberOfColumns,
+                    "Left" => -1,
+                    "Right" => 1,
+                    _ => 0
+                };
+
+                if (delta != 0)
+                {
+                    LogToFile($"[XInput] Controller {controller}: {(isSingle ? "Single" : "Continuous")} MoveSelection: {action} at {DateTime.Now:HH:mm:ss.fff}");
+                    MoveSelection(delta);
+                    if (DebugXInputOverlay)
+                    {
+                        var overlayLines = xInputOverlayText.Text.Split('\n');
+                        if (controller < overlayLines.Length)
+                        {
+                            overlayLines[controller] = $"C{controller}: {action} -> {(isSingle ? "Single" : "Continuous")}";
+                            xInputOverlayText.Text = string.Join("\n", overlayLines);
+                        }
+                    }
+                }
+            }
+
+            // Check for conflicting directions
+            if ((activeDirections.Contains("Up") && activeDirections.Contains("Down")) ||
+            (activeDirections.Contains("Left") && activeDirections.Contains("Right")))
+            {
+                LogToFile("[XInput] Conflicting directions detected, skipping MoveSelection.");
+            }
         }
 
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -606,11 +687,13 @@ namespace ArcadeLauncher.SW3
             {
                 if (games != null && SelectedIndex >= 0 && SelectedIndex < games.Count)
                 {
+                    LogToFile($"Select key ({keyString}) pressed at {DateTime.Now:HH:mm:ss.fff}: Launching game at index {SelectedIndex}.");
                     LaunchGame(games[SelectedIndex]);
                 }
             }
             else if (settings.InputMappings.ContainsKey("Exit") && settings.InputMappings["Exit"].Contains(keyString, StringComparer.OrdinalIgnoreCase))
             {
+                LogToFile($"Exit key ({keyString}) pressed at {DateTime.Now:HH:mm:ss.fff}: Shutting down application.");
                 System.Windows.Application.Current.Shutdown();
             }
         }
@@ -820,6 +903,13 @@ namespace ArcadeLauncher.SW3
                     fadeOutTimer.Stop();
                     Visibility = Visibility.Hidden;
                     LogToFile($"T1 MainWindow fade-out completed at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}, IsLoaded: {IsLoaded}");
+
+                    // Stop XInput polling after T1 fade-out
+                    if (xInputTimer != null)
+                    {
+                        xInputTimer.Stop();
+                        LogToFile($"XInput polling stopped at LaunchGame after T1 fade-out at {DateTime.Now:HH:mm:ss.fff}.");
+                    }
 
                     // Update marquee and controller images after fade-out
                     if (marqueeWindow != null && marqueeWindow.Content is Grid marqueeGrid)
