@@ -30,8 +30,8 @@ namespace ArcadeLauncher.SW3
         private int selectedIndex = 0;
         private ScrollViewer scrollViewer = null!;
         private ItemsControl gameItemsControl = null!;
-        private Window marqueeWindow = null!;
-        private Window controllerWindow = null!;
+        private Window? marqueeWindow; // Made nullable to fix CS8625
+        private Window? controllerWindow; // Made nullable to fix CS8625
         private float dpiScaleFactor; // DPI scaling factor (e.g., 1.25 for 125% scaling)
         private List<Bitmap> preloadedImages = null!; // Store preloaded composite images
         private double topMargin; // Store the top margin for use in scrolling methods
@@ -103,7 +103,7 @@ namespace ArcadeLauncher.SW3
             {
                 // Calculate the DPI scaling factor after the window is loaded
                 var presentationSource = PresentationSource.FromVisual(this);
-                if (presentationSource != null)
+                if (presentationSource?.CompositionTarget != null)
                 {
                     dpiScaleFactor = (float)(presentationSource.CompositionTarget.TransformToDevice.M11);
                     LogToFile($"DPI Scaling Factor: {dpiScaleFactor}");
@@ -429,7 +429,7 @@ namespace ArcadeLauncher.SW3
             };
             Canvas.SetLeft(scrollViewer, 0);
             Canvas.SetTop(scrollViewer, 0); // Explicitly set Y position to 0
-            // Enable double-buffering for the ScrollViewer
+                                            // Enable double-buffering for the ScrollViewer
             scrollViewer.SetValue(RenderOptions.BitmapScalingModeProperty, BitmapScalingMode.HighQuality);
             // Optimize rendering
             scrollViewer.SetValue(RenderOptions.EdgeModeProperty, EdgeMode.Aliased);
@@ -455,9 +455,9 @@ namespace ArcadeLauncher.SW3
         private void LoadData()
         {
             games = DataManager.LoadGameData().Games
-                .Where(g => !g.IsInProgress) // Filter out games where IsInProgress is true
-                .OrderBy(g => g.AlphabetizeName)
-                .ToList();
+            .Where(g => !g.IsInProgress) // Filter out games where IsInProgress is true
+            .OrderBy(g => g.AlphabetizeName)
+            .ToList();
             settings = DataManager.LoadSettings();
             plugins = LoadPlugins(); // Ensure this method is accessible
         }

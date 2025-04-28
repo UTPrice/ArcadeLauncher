@@ -27,7 +27,8 @@ namespace ArcadeLauncher.SW3
         private const float T1FadeInDuration = 0.8f;
         private const float T1OverlapPercentage = 0.98f;
         private DispatcherTimer? focusTimer; // Track focus timer to stop existing ones
-        private DispatcherTimer inputTimer; // Timer for XInput processing
+        private DispatcherTimer? inputTimer; // Made nullable to fix CS8618
+        private HookProc? hookProc; // Made nullable to fix CS8618
 
         private delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
         private const int WH_KEYBOARD_LL = 13;
@@ -64,14 +65,16 @@ namespace ArcadeLauncher.SW3
         private const uint PROCESS_TERMINATE = 0x0001;
         private const uint PROCESS_QUERY_INFORMATION = 0x0400;
 
-        private HookProc hookProc;
-
         private void InitializeGameLogic()
         {
             hookProc = HookCallback;
             using (var curProcess = System.Diagnostics.Process.GetCurrentProcess())
             using (var curModule = curProcess.MainModule)
             {
+                if (curModule == null)
+                {
+                    throw new InvalidOperationException("Failed to retrieve the main module of the current process.");
+                }
                 hookId = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, GetModuleHandle(curModule.ModuleName), 0);
                 if (hookId == IntPtr.Zero)
                 {
@@ -135,7 +138,7 @@ namespace ArcadeLauncher.SW3
             };
         }
 
-        private void InputTimer_Tick(object sender, EventArgs e)
+        private void InputTimer_Tick(object? sender, EventArgs e) // Fixed CS8622 by making sender nullable
         {
             if (isGameActive) return; // Skip input processing during game play
 
@@ -920,7 +923,7 @@ namespace ArcadeLauncher.SW3
 
                     if (controllerWindow != null && controllerWindow.Content is Grid controllerGrid)
                     {
-                        string splashImagePath = null;
+                        string? splashImagePath = null; // Fixed CS8600 by making nullable
                         if (screenHeightPhysical >= 2160 && game.SplashScreenPath.ContainsKey("4k"))
                         {
                             splashImagePath = game.SplashScreenPath["4k"];

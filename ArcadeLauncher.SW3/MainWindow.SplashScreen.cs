@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -71,17 +70,17 @@ namespace ArcadeLauncher.SW3
             private Canvas canvas;
             private System.Windows.Shapes.Ellipse shadowArcEllipse;
             private System.Windows.Shapes.Path progressArcPath;
-            private System.Windows.Shapes.Path glowArcPath;
+            private System.Windows.Shapes.Path? glowArcPath; // Made nullable to fix CS8618
             private System.Windows.Controls.TextBlock gameNameText;
             private System.Windows.Controls.TextBlock progressText;
             private System.Windows.Shapes.Rectangle darkenedBar;
 
-            private DispatcherTimer fadeTimer;
-            private DispatcherTimer progressTimer;
-            private DispatcherTimer fadeOutTimer;
-            private DispatcherTimer fadeInTimer;
-            private DispatcherTimer overlapTimer;
-            private DispatcherTimer t4FallbackTimer;
+            private DispatcherTimer? fadeTimer; // Made nullable to fix CS8618
+            private DispatcherTimer? progressTimer; // Made nullable to fix CS8618
+            private DispatcherTimer? fadeOutTimer; // Made nullable to fix CS8618
+            private DispatcherTimer? fadeInTimer; // Made nullable to fix CS8618
+            private DispatcherTimer? overlapTimer; // Made nullable to fix CS8618
+            private DispatcherTimer? t4FallbackTimer; // Made nullable to fix CS8618
             private Action onComplete;
             private readonly bool startFadeTimerOnConstruction;
 
@@ -243,13 +242,13 @@ namespace ArcadeLauncher.SW3
                 isFadingIn = true;
                 Opacity = currentOpacity;
                 parentWindow.LogToFile($"Starting fadeTimer at {DateTime.Now:HH:mm:ss.fff}. Initial Opacity: {Opacity}, isFadingIn: {isFadingIn}");
-                fadeTimer.Start();
+                fadeTimer!.Start();
             }
 
             public void StartProgressTimer()
             {
                 parentWindow.LogToFile($"Starting progressTimer for {(isLaunchPhase ? "T1" : "T3")} at {DateTime.Now:HH:mm:ss.fff}.");
-                progressTimer.Start();
+                progressTimer!.Start();
                 if (!isLaunchPhase)
                 {
                     // Start fallback timer to restore MainWindow if T4 doesn't start
@@ -299,7 +298,7 @@ namespace ArcadeLauncher.SW3
                     parentWindow.LogToFile($"T3 fade-in animation completed at {DateTime.Now:HH:mm:ss.fff}. Final Opacity: {Opacity}, Visibility: {Visibility}");
                     try
                     {
-                        progressTimer.Start();
+                        progressTimer!.Start();
                         parentWindow.LogToFile($"ProgressTimer started for T3 at {DateTime.Now:HH:mm:ss.fff}.");
                     }
                     catch (Exception ex)
@@ -323,7 +322,7 @@ namespace ArcadeLauncher.SW3
 
             private void LoadSplashImage()
             {
-                string imagePath = null;
+                string? imagePath = null; // Made nullable to fix CS8600
                 if (screenHeightPhysical >= 2160 && game.SplashScreenPath.ContainsKey("4k"))
                 {
                     imagePath = game.SplashScreenPath["4k"];
@@ -392,7 +391,7 @@ namespace ArcadeLauncher.SW3
                     {
                         currentOpacity = 1;
                         isFadingIn = false;
-                        progressTimer.Start();
+                        progressTimer!.Start();
                         parentWindow.LogToFile($"Fade-in complete at {DateTime.Now:HH:mm:ss.fff}. Starting progressTimer.");
                     }
                 }
@@ -402,7 +401,7 @@ namespace ArcadeLauncher.SW3
                     if (currentOpacity <= 0)
                     {
                         currentOpacity = 0;
-                        fadeTimer.Stop();
+                        fadeTimer!.Stop();
                         parentWindow.LogToFile($"SplashScreenWindow fade-out complete at {DateTime.Now:HH:mm:ss.fff}, invoking onComplete.");
                         try
                         {
@@ -433,7 +432,7 @@ namespace ArcadeLauncher.SW3
                     if (progressValue >= 100)
                     {
                         progressValue = 100;
-                        progressTimer.Stop();
+                        progressTimer!.Stop();
                         t4FallbackTimer?.Stop();
                         parentWindow.LogToFile($"ProgressTimer stopped at {DateTime.Now:HH:mm:ss.fff}: ProgressValue={progressValue}%. Initiating {(isLaunchPhase ? "T2" : "T4")}.");
 
@@ -611,7 +610,7 @@ namespace ArcadeLauncher.SW3
                 catch (Exception ex)
                 {
                     parentWindow.LogToFile($"Error in ProgressTimer_Tick at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                    progressTimer.Stop();
+                    progressTimer!.Stop();
                     t4FallbackTimer?.Stop();
                     Close();
                 }
@@ -648,12 +647,12 @@ namespace ArcadeLauncher.SW3
                 double featherEndRadius = (outerDiameter + featherDistance) / totalDiameter / 2;
 
                 gradientBrush.GradientStops = new GradientStopCollection
-                {
-                    new GradientStop(Colors.Transparent, 0.0),
-                    new GradientStop(Colors.Transparent, innerRadius),
-                    new GradientStop(Color.FromArgb((byte)(BaseCircleOpacity * 255), 0, 0, 0), peakRadius),
-                    new GradientStop(Colors.Transparent, featherEndRadius)
-                };
+{
+new GradientStop(Colors.Transparent, 0.0),
+new GradientStop(Colors.Transparent, innerRadius),
+new GradientStop(Color.FromArgb((byte)(BaseCircleOpacity * 255), 0, 0, 0), peakRadius),
+new GradientStop(Colors.Transparent, featherEndRadius)
+};
                 shadowArcEllipse.Fill = gradientBrush;
 
                 int sweepAngle = (int)(progressValue * 3.6);
@@ -678,12 +677,12 @@ namespace ArcadeLauncher.SW3
                 float fadeStart = (float)(0.5 - (FadeStartPercentage / 100.0));
                 float fadeEnd = (float)(0.5 + (FadeStartPercentage / 100.0));
                 gradientBrushBar.GradientStops = new GradientStopCollection
-                {
-                    new GradientStop(System.Windows.Media.Color.FromArgb((byte)(FadeEndOpacity * 255), 0, 0, 0), 0.0),
-                    new GradientStop(System.Windows.Media.Color.FromArgb((byte)(BarBaseOpacity * 255), 0, 0, 0), fadeStart),
-                    new GradientStop(System.Windows.Media.Color.FromArgb((byte)(BarBaseOpacity * 255), 0, 0, 0), fadeEnd),
-                    new GradientStop(System.Windows.Media.Color.FromArgb((byte)(FadeEndOpacity * 255), 0, 0, 0), 1.0)
-                };
+{
+new GradientStop(System.Windows.Media.Color.FromArgb((byte)(FadeEndOpacity * 255), 0, 0, 0), 0.0),
+new GradientStop(System.Windows.Media.Color.FromArgb((byte)(BarBaseOpacity * 255), 0, 0, 0), fadeStart),
+new GradientStop(System.Windows.Media.Color.FromArgb((byte)(BarBaseOpacity * 255), 0, 0, 0), fadeEnd),
+new GradientStop(System.Windows.Media.Color.FromArgb((byte)(FadeEndOpacity * 255), 0, 0, 0), 1.0)
+};
                 darkenedBar.Fill = gradientBrushBar;
 
                 Canvas.SetLeft(gameNameText, (screenWidthPhysical / dpiScaleFactor - gameNameText.ActualWidth) / 2);
