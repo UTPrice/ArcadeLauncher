@@ -10,6 +10,7 @@
     <RootNamespace>ArcadeLauncher.Core</RootNamespace>
     <AssemblyName>ArcadeLauncher.Core</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <RuntimeIdentifiers>win</RuntimeIdentifiers>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
   </PropertyGroup>

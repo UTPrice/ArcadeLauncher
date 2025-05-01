@@ -20,7 +20,9 @@ namespace ArcadeLauncher.SW3
     {
         private Process? activeProcess;
         private DateTime? lastKillPressTime;
+        private DateTime? lastToggleOverlayPressTime; // Track the last toggle overlay press time
         private bool isGameActive;
+        private bool isOverlayVisible = true; // Track the visibility state of the overlay (default to visible)
         private const int DoublePressThreshold = 500;
         private IntPtr hookId = IntPtr.Zero;
         private const float T1FadeOutDuration = 0.8f;
@@ -236,6 +238,7 @@ namespace ArcadeLauncher.SW3
                         }
                     }
 
+                    // Handle Kill Switch
                     if (settings != null && settings.InputMappings.ContainsKey("Kill") && settings.InputMappings["Kill"].Any())
                     {
                         if (settings.InputMappings["Kill"].Contains(keyString, StringComparer.OrdinalIgnoreCase))
@@ -275,6 +278,29 @@ namespace ArcadeLauncher.SW3
                             }
                         }
                     }
+
+                    // Handle Toggle Overlay
+                    if (settings != null && settings.InputMappings.ContainsKey("ToggleOverlay") && settings.InputMappings["ToggleOverlay"].Any())
+                    {
+                        if (settings.InputMappings["ToggleOverlay"].Contains(keyString, StringComparer.OrdinalIgnoreCase))
+                        {
+                            DateTime currentTime = DateTime.Now;
+                            if (lastToggleOverlayPressTime.HasValue && (currentTime - lastToggleOverlayPressTime.Value).TotalMilliseconds <= DoublePressThreshold)
+                            {
+                                Dispatcher.Invoke(() =>
+                                {
+                                    LogToFile($"Global hook: Toggle Overlay double-press detected for key {keyString} at {DateTime.Now:HH:mm:ss.fff}.");
+                                    ToggleOverlayVisibility();
+                                    lastToggleOverlayPressTime = null;
+                                });
+                            }
+                            else
+                            {
+                                lastToggleOverlayPressTime = currentTime;
+                                LogToFile($"Global hook: Toggle Overlay single press detected for key {keyString} at {DateTime.Now:HH:mm:ss.fff}. Waiting for second press within {DoublePressThreshold}ms.");
+                            }
+                        }
+                    }
                 }
                 return CallNextHookEx(hookId, nCode, wParam, lParam);
             }
@@ -282,6 +308,20 @@ namespace ArcadeLauncher.SW3
             {
                 LogToFile($"Error in HookCallback at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
                 return CallNextHookEx(hookId, nCode, wParam, lParam);
+            }
+        }
+
+        private void ToggleOverlayVisibility()
+        {
+            if (xInputOverlayCanvas != null)
+            {
+                isOverlayVisible = !isOverlayVisible;
+                xInputOverlayCanvas.Visibility = isOverlayVisible ? Visibility.Visible : Visibility.Hidden;
+                LogToFile($"Overlay visibility toggled at {DateTime.Now:HH:mm:ss.fff}: isOverlayVisible={isOverlayVisible}, Visibility={xInputOverlayCanvas.Visibility}");
+            }
+            else
+            {
+                LogToFile($"Cannot toggle overlay visibility at {DateTime.Now:HH:mm:ss.fff}: xInputOverlayCanvas is null.");
             }
         }
 
