@@ -34,7 +34,9 @@ namespace ArcadeLauncher.SW2
                 buttonWidth = TextRenderer.MeasureText("Capture", largeFont).Width + (int)(15 * scalingFactor);
             }
 
-            int labelWidth = (int)(250 * scalingFactor);
+            // Calculate labelWidth based on the longest label text
+            string longestLabel = "Define Toggle Overlay (x2)"; // Longest label text
+            int labelWidth = TextRenderer.MeasureText(longestLabel, largeFont).Width + (int)(20 * scalingFactor); // Add padding
             int inputWidth = (int)(600 * scalingFactor);
             int buttonHeight = inputHeight;
             int labelHeight = inputHeight;
@@ -96,7 +98,7 @@ namespace ArcadeLauncher.SW2
             string initialMarqueeText = marqueeTextBox.Text;
             string initialControllerText = controllerTextBox.Text;
 
-            var buttonLabels = new string[] { "Left", "Right", "Up", "Down", "Select", "Exit", "Kill" };
+            var buttonLabels = new string[] { "Left", "Right", "Up", "Down", "Select", "Exit", "Kill", "ToggleOverlay" };
             var buttonTextBoxes = new TextBox[buttonLabels.Length];
             var clearButtons = new Button[buttonLabels.Length];
             var captureButtons = new Button[buttonLabels.Length];
@@ -254,6 +256,12 @@ namespace ArcadeLauncher.SW2
                 killLabel.Text = "Define Kill Button(s) (x2)";
             }
 
+            var toggleOverlayLabel = mainPanel.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Define ToggleOverlay Button(s)");
+            if (toggleOverlayLabel != null)
+            {
+                toggleOverlayLabel.Text = "Define Toggle Overlay (x2)";
+            }
+
             var saveSettingsButton = new Button { Text = "Save Settings", Top = currentTop, Left = column1Left, Width = buttonWidth, Height = buttonHeight, Font = largeFont };
             var cancelSettingsButton = new Button { Text = "Cancel", Top = currentTop, Left = column1Left + buttonWidth + columnGap, Width = buttonWidth, Height = buttonHeight, Font = largeFont };
 
@@ -349,7 +357,7 @@ namespace ArcadeLauncher.SW2
             {
                 using (var dialog = new OpenFileDialog())
                 {
-                    dialog.Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp";
+                    dialog.Filter = "Image Files|.png;.jpg;.jpeg;.bmp";
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
                         marqueeTextBox.Text = dialog.FileName;
@@ -362,7 +370,7 @@ namespace ArcadeLauncher.SW2
             {
                 using (var dialog = new OpenFileDialog())
                 {
-                    dialog.Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp";
+                    dialog.Filter = "Image Files|.png;.jpg;.jpeg;.bmp";
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
                         controllerTextBox.Text = dialog.FileName;

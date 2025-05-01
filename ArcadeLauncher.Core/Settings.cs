@@ -23,7 +23,8 @@ namespace ArcadeLauncher.Core
                 { "Down", new List<string> { "DownArrow" } },
                 { "Select", new List<string> { "Enter" } }, // Renamed from "Launch" to "Select"
                 { "Exit", new List<string> { "Escape" } },
-                { "Kill", new List<string>() } // New Kill Switch mapping, empty by default
+                { "Kill", new List<string>() }, // New Kill Switch mapping, empty by default
+                { "ToggleOverlay", new List<string>() } // New Toggle Overlay mapping, empty by default
             };
             FadeDuration = 0.75; // Initialize default fade duration
         }
