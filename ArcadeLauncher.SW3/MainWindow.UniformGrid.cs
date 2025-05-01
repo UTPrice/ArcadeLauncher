@@ -40,16 +40,18 @@ namespace ArcadeLauncher.SW3
             LogToFile($"Number of Columns (columns) = {columns}");
 
             double baseBorderThickness = 5; // Base thickness of the highlight border (before DPI scaling)
-            LogToFile($"Base Border Thickness (baseBorderThickness) = {baseBorderThickness} (logical pixels) = {baseBorderThickness * 1.25} (physical pixels)");
+            LogToFile($"Base Border Thickness (baseBorderThickness) = {baseBorderThickness} (logical pixels) = {baseBorderThickness * dpiScaleFactor} (physical pixels)");
 
-            borderThickness = baseBorderThickness * dpiScaleFactor; // Scale the border thickness for DPI
-            LogToFile($"Border Thickness (borderThickness) = {borderThickness} (logical pixels) = {borderThickness * 1.25} (physical pixels)");
+            // Set border thickness to a consistent physical size (8 physical pixels) across DPI settings
+            double targetPhysicalBorderThickness = 8; // Target 8 physical pixels for consistency
+            borderThickness = targetPhysicalBorderThickness / dpiScaleFactor; // Logical pixels, DPI-compensated
+            LogToFile($"Border Thickness (borderThickness) = {borderThickness} (logical pixels) = {borderThickness * dpiScaleFactor} (physical pixels)");
 
             // Step 1: Get the screen width in logical pixels (already DPI-adjusted)
             double totalWidth = SystemParameters.PrimaryScreenWidth; // Logical pixels, DPI-adjusted
             LogToFile($"Step 1 - Screen Width: totalWidth={totalWidth} (logical pixels)");
             LogToFile($"ClientSize.Width (for reference): {ActualWidth} (logical pixels)");
-            LogToFile($"Total Width (totalWidth) = {totalWidth} (logical pixels) = {totalWidth * 1.25} (physical pixels)");
+            LogToFile($"Total Width (totalWidth) = {totalWidth} (logical pixels) = {totalWidth * dpiScaleFactor} (physical pixels)");
 
             // Step 2: Allocate percentages using the physical width
             double artBoxPercentage = 0.825; // 82.5% for art boxes
@@ -60,69 +62,69 @@ namespace ArcadeLauncher.SW3
 
             // Calculate art box and empty space in logical pixels
             double totalArtBoxWidth = totalWidth * artBoxPercentage;
-            LogToFile($"Total Art Box Width (totalArtBoxWidth) = {totalArtBoxWidth} (logical pixels) = {totalArtBoxWidth * 1.25} (physical pixels)");
+            LogToFile($"Total Art Box Width (totalArtBoxWidth) = {totalArtBoxWidth} (logical pixels) = {totalArtBoxWidth * dpiScaleFactor} (physical pixels)");
 
             double totalEmptySpace = totalWidth * emptySpacePercentage;
-            LogToFile($"Total Empty Space (totalEmptySpace) = {totalEmptySpace} (logical pixels) = {totalEmptySpace * 1.25} (physical pixels)");
+            LogToFile($"Total Empty Space (totalEmptySpace) = {totalEmptySpace} (logical pixels) = {totalEmptySpace * dpiScaleFactor} (physical pixels)");
 
             // Calculate art box width (including borders)
             double boxWidth = totalArtBoxWidth / columns;
-            LogToFile($"Box Width with Border (boxWidth) = {boxWidth} (logical pixels) = {boxWidth * 1.25} (physical pixels)");
+            LogToFile($"Box Width with Border (boxWidth) = {boxWidth} (logical pixels) = {boxWidth * dpiScaleFactor} (physical pixels)");
 
             // Calculate empty space sections
             int numberOfSections = (columns - 1) * 2 + 2; // (n-1)*2 + 2 sections
             LogToFile($"Number of Sections (numberOfSections) = {numberOfSections}");
 
             double emptySpaceSection = totalEmptySpace / numberOfSections;
-            LogToFile($"Empty Space Section Width (emptySpaceSection) = {emptySpaceSection} (logical pixels) = {emptySpaceSection * 1.25} (physical pixels)");
+            LogToFile($"Empty Space Section Width (emptySpaceSection) = {emptySpaceSection} (logical pixels) = {emptySpaceSection * dpiScaleFactor} (physical pixels)");
 
             // Set margins
             marginWidth = emptySpaceSection; // Assign to the class-level field
-            LogToFile($"Margin Width (marginWidth) = {marginWidth} (logical pixels) = {marginWidth * 1.25} (physical pixels)");
+            LogToFile($"Margin Width (marginWidth) = {marginWidth} (logical pixels) = {marginWidth * dpiScaleFactor} (physical pixels)");
 
             topMargin = emptySpaceSection;
-            LogToFile($"Top Margin (topMargin) = {topMargin} (logical pixels) = {topMargin * 1.25} (physical pixels)");
+            LogToFile($"Top Margin (topMargin) = {topMargin} (logical pixels) = {topMargin * dpiScaleFactor} (physical pixels)");
 
             double bottomMargin = topMargin; // Bottom margin equals top margin
-            LogToFile($"Bottom Margin (bottomMargin) = {bottomMargin} (logical pixels) = {bottomMargin * 1.25} (physical pixels)");
+            LogToFile($"Bottom Margin (bottomMargin) = {bottomMargin} (logical pixels) = {bottomMargin * dpiScaleFactor} (physical pixels)");
 
             // Calculate vertical gap (adjusted to achieve 29 pixels of grey between art boxes at 125% DPI)
             double verticalGap = topMargin * 1.5104166666666667; // This was previously set to target 29 pixels, but we'll override adjustedVerticalGap
-            LogToFile($"Vertical Gap (verticalGap) = {verticalGap} (logical pixels) = {verticalGap * 1.25} (physical pixels)");
+            LogToFile($"Vertical Gap (verticalGap) = {verticalGap} (logical pixels) = {verticalGap * dpiScaleFactor} (physical pixels)");
 
             // Calculate box height using the exact aspect ratio of 4/3 applied to the image's width (excluding borders)
             double imageWidth = boxWidth - 2 * borderThickness; // Width of the image excluding borders
-            LogToFile($"Image Width Excluding Borders (imageWidth) = {imageWidth} (logical pixels) = {imageWidth * 1.25} (physical pixels)");
+            LogToFile($"Image Width Excluding Borders (imageWidth) = {imageWidth} (logical pixels) = {imageWidth * dpiScaleFactor} (physical pixels)");
 
             double imageHeight = imageWidth * (4.0 / 3.0); // Apply 4/3 aspect ratio to the image width
-            LogToFile($"Image Height (imageHeight) = {imageHeight} (logical pixels) = {imageHeight * 1.25} (physical pixels)");
+            LogToFile($"Image Height (imageHeight) = {imageHeight} (logical pixels) = {imageHeight * dpiScaleFactor} (physical pixels)");
 
             double boxHeight = imageHeight + 2 * borderThickness; // Add borders to get total height
-            LogToFile($"Box Height with Border (boxHeight) = {boxHeight} (logical pixels) = {boxHeight * 1.25} (physical pixels)");
+            LogToFile($"Box Height with Border (boxHeight) = {boxHeight} (logical pixels) = {boxHeight * dpiScaleFactor} (physical pixels)");
 
             // Total calculated width is the full screen width
             totalCalculatedWidth = totalWidth;
-            LogToFile($"Total Calculated Width (totalCalculatedWidth) = {totalCalculatedWidth} (logical pixels) = {totalCalculatedWidth * 1.25} (physical pixels)");
+            LogToFile($"Total Calculated Width (totalCalculatedWidth) = {totalCalculatedWidth} (logical pixels) = {totalCalculatedWidth * dpiScaleFactor} (physical pixels)");
 
             // Set adjustedVerticalGap to a DPI-compensated value equivalent to -8 logical pixels at 125% DPI
             double targetPhysicalOverlap = -10; // -8 logical pixels at 125% DPI = -10 physical pixels
             LogToFile($"Target Physical Overlap (targetPhysicalOverlap) = {targetPhysicalOverlap} (physical pixels)");
 
             adjustedVerticalGap = targetPhysicalOverlap / dpiScaleFactor; // DPI-compensated overlap
-            LogToFile($"Adjusted Vertical Gap (adjustedVerticalGap) = {adjustedVerticalGap} (logical pixels) = {adjustedVerticalGap * 1.25} (physical pixels)");
+            LogToFile($"Adjusted Vertical Gap (adjustedVerticalGap) = {adjustedVerticalGap} (logical pixels) = {adjustedVerticalGap * dpiScaleFactor} (physical pixels)");
 
             // Safeguard: Ensure the overlap doesn't exceed the BorderThickness on both sides to prevent clipping
             double minAdjustedVerticalGap = -2 * borderThickness;
-            LogToFile($"Minimum Adjusted Vertical Gap (minAdjustedVerticalGap) = {minAdjustedVerticalGap} (logical pixels) = {minAdjustedVerticalGap * 1.25} (physical pixels)");
+            LogToFile($"Minimum Adjusted Vertical Gap (minAdjustedVerticalGap) = {minAdjustedVerticalGap} (logical pixels) = {minAdjustedVerticalGap * dpiScaleFactor} (physical pixels)");
 
             if (adjustedVerticalGap < minAdjustedVerticalGap)
             {
                 adjustedVerticalGap = minAdjustedVerticalGap;
-                LogToFile($"Adjusted Vertical Gap Clamped (adjustedVerticalGap) = {adjustedVerticalGap} (logical pixels) = {adjustedVerticalGap * 1.25} (physical pixels)");
+                LogToFile($"Adjusted Vertical Gap Clamped (adjustedVerticalGap) = {adjustedVerticalGap} (logical pixels) = {adjustedVerticalGap * dpiScaleFactor} (physical pixels)");
             }
 
             double expectedVerticalGap = adjustedVerticalGap + 2 * borderThickness;
-            LogToFile($"Expected Vertical Gap (adjustedVerticalGap + 2 * borderThickness) = {expectedVerticalGap} (logical pixels) = {expectedVerticalGap * 1.25} (physical pixels)");
+            LogToFile($"Expected Vertical Gap (adjustedVerticalGap + 2 * borderThickness) = {expectedVerticalGap} (logical pixels) = {expectedVerticalGap * dpiScaleFactor} (physical pixels)");
 
             // Calculate the number of rows needed for actual games
             rows = (int)Math.Ceiling((double)games.Count / columns); // Set the class-level field
@@ -169,7 +171,7 @@ namespace ArcadeLauncher.SW3
             itemContainerStyle.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(borderThickness)));
             itemContainerStyle.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(System.Windows.Media.Color.FromRgb(85, 85, 85)))); // Background color #555555
             itemContainerStyle.Setters.Add(new Setter(Border.FocusVisualStyleProperty, null)); // Disable the default focus visual style
-            // Use a DataTrigger with a MultiBinding and EqualityConverter to compare Tag with SelectedIndex
+                                                                                               // Use a DataTrigger with a MultiBinding and EqualityConverter to compare Tag with SelectedIndex
             var trigger = new DataTrigger();
             var multiBinding = new MultiBinding
             {
@@ -249,8 +251,8 @@ namespace ArcadeLauncher.SW3
                         Height = boxHeight - 2 * borderThickness, // Reduce size to fit within BorderThickness
                         Style = imageStyle // Apply the style with the shadow
                     };
-                    LogToFile($"Art Box Image Width for Image {i} (artBoxImage.Width) = {artBoxImage.Width} (logical pixels) = {artBoxImage.Width * 1.25} (physical pixels)");
-                    LogToFile($"Art Box Image Height for Image {i} (artBoxImage.Height) = {artBoxImage.Height} (logical pixels) = {artBoxImage.Height * 1.25} (physical pixels)");
+                    LogToFile($"Art Box Image Width for Image {i} (artBoxImage.Width) = {artBoxImage.Width} (logical pixels) = {artBoxImage.Width * dpiScaleFactor} (physical pixels)");
+                    LogToFile($"Art Box Image Height for Image {i} (artBoxImage.Height) = {artBoxImage.Height} (logical pixels) = {artBoxImage.Height * dpiScaleFactor} (physical pixels)");
 
                     outerBorder.Child = artBoxImage;
                 }
@@ -300,24 +302,24 @@ namespace ArcadeLauncher.SW3
             gameItemsControl.ItemsSource = items;
             // Apply the top margin, no horizontal margins since UniformGrid spans the full width
             gameItemsControl.Margin = new Thickness(0, topMargin, 0, 0);
-            LogToFile($"ItemsControl Top Margin (gameItemsControl.Margin.Top) = {gameItemsControl.Margin.Top} (logical pixels) = {gameItemsControl.Margin.Top * 1.25} (physical pixels)");
+            LogToFile($"ItemsControl Top Margin (gameItemsControl.Margin.Top) = {gameItemsControl.Margin.Top} (logical pixels) = {gameItemsControl.Margin.Top * dpiScaleFactor} (physical pixels)");
 
             // Set the total height of the ItemsControl, accounting for the BorderThickness and bottom margin
             double rowHeight = boxHeight + 2 * borderThickness + adjustedVerticalGap;
-            LogToFile($"Row Height (rowHeight) = {rowHeight} (logical pixels) = {rowHeight * 1.25} (physical pixels)");
+            LogToFile($"Row Height (rowHeight) = {rowHeight} (logical pixels) = {rowHeight * dpiScaleFactor} (physical pixels)");
 
             gameItemsControl.Height = topMargin + (totalRows * rowHeight) + bottomMargin; // Use totalRows to include the dummy row
-            LogToFile($"ItemsControl Height (gameItemsControl.Height) = {gameItemsControl.Height} (logical pixels) = {gameItemsControl.Height * 1.25} (physical pixels)");
+            LogToFile($"ItemsControl Height (gameItemsControl.Height) = {gameItemsControl.Height} (logical pixels) = {gameItemsControl.Height * dpiScaleFactor} (physical pixels)");
 
             // No left or right margins on the MarginBorder since UniformGrid spans the full width
             Canvas.SetLeft(marginBorder, 0);
             Canvas.SetTop(marginBorder, 0);
             marginBorder.Width = totalCalculatedWidth; // Full screen width
-            LogToFile($"MarginBorder Width (marginBorder.Width) = {marginBorder.Width} (logical pixels) = {marginBorder.Width * 1.25} (physical pixels)");
+            LogToFile($"MarginBorder Width (marginBorder.Width) = {marginBorder.Width} (logical pixels) = {marginBorder.Width * dpiScaleFactor} (physical pixels)");
 
             // Constrain the MarginBorder's height to the window's visible height to enable scrolling
             marginBorder.Height = this.ActualHeight;
-            LogToFile($"MarginBorder Height (marginBorder.Height) = {marginBorder.Height} (logical pixels) = {marginBorder.Height * 1.25} (physical pixels)");
+            LogToFile($"MarginBorder Height (marginBorder.Height) = {marginBorder.Height} (logical pixels) = {marginBorder.Height * dpiScaleFactor} (physical pixels)");
         }
     }
 }
