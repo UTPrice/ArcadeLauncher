@@ -22,7 +22,7 @@ namespace ArcadeLauncher.SW3
         private DateTime? lastKillPressTime;
         private DateTime? lastToggleOverlayPressTime; // Track the last toggle overlay press time
         private bool isGameActive;
-        private bool isOverlayVisible = true; // Track the visibility state of the overlay (default to visible)
+        private bool isOverlayVisible = false; // Default to off (hidden) when SW3 starts
         private const int DoublePressThreshold = 500;
         private IntPtr hookId = IntPtr.Zero;
         private const float T1FadeOutDuration = 0.8f;

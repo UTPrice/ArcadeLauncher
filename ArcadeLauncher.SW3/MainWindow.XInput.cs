@@ -15,6 +15,7 @@ namespace ArcadeLauncher.SW3
         private const int XInputPollingIntervalMs = 8;
         private const int XInputHoldThresholdMs = 500;
         private const int ContinuousMoveIntervalMs = 100;
+        private const int CpuUpdateIntervalMs = 1000; // Update CPU usage every 1000ms (1 second)
 
         [DllImport("xinput1_4.dll", EntryPoint = "XInputGetState")]
         private static extern uint XInputGetState(uint dwUserIndex, ref XINPUT_STATE pState);
@@ -53,7 +54,9 @@ namespace ArcadeLauncher.SW3
         private int tickCount;
         private DateTime lastFpsUpdate;
         private double fps;
-        // Track last log time for "Input ignored" per direction to throttle logs
+        private float lastCpuUsage; // Store the last CPU usage value
+        private DateTime lastCpuUpdate; // Track the last time CPU usage was updated
+                                        // Track last log time for "Input ignored" per direction to throttle logs
         private List<(DateTime Up, DateTime Down, DateTime Left, DateTime Right)> lastIgnoreLogTimes;
 
         private void InitializeXInput()
@@ -84,12 +87,14 @@ namespace ArcadeLauncher.SW3
             try
             {
                 cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-                cpuCounter.NextValue();
+                lastCpuUsage = cpuCounter.NextValue(); // Initialize with the first value
+                lastCpuUpdate = DateTime.Now; // Initialize the last update time
             }
             catch (Exception ex)
             {
                 LogToFile($"[XInput] Failed to initialize CPU counter: {ex.Message}");
                 cpuCounter = null;
+                lastCpuUsage = 0f;
             }
 
             tickCount = 0;
@@ -105,7 +110,8 @@ namespace ArcadeLauncher.SW3
             {
                 Background = new SolidColorBrush(Color.FromArgb(128, 0, 0, 0)),
                 Width = 300,
-                Height = 150
+                Height = 150,
+                Visibility = Visibility.Hidden // Start with the overlay hidden
             };
             Canvas.SetLeft(xInputOverlayCanvas, 10);
             Canvas.SetTop(xInputOverlayCanvas, 10);
@@ -121,7 +127,7 @@ namespace ArcadeLauncher.SW3
             xInputOverlayCanvas.Children.Add(xInputOverlayText);
 
             canvas.Children.Add(xInputOverlayCanvas);
-            LogToFile("[XInput] Debug overlay initialized.");
+            LogToFile("[XInput] Debug overlay initialized with initial Visibility set to Hidden.");
         }
 
         private void XInputTimer_Tick(object? sender, EventArgs e)
@@ -228,12 +234,18 @@ namespace ArcadeLauncher.SW3
                     lastFpsUpdate = now;
                 }
 
-                float cpuUsage = cpuCounter != null ? cpuCounter.NextValue() : 0f;
+                // Throttle CPU usage updates to once per second
+                if ((now - lastCpuUpdate).TotalMilliseconds >= CpuUpdateIntervalMs)
+                {
+                    lastCpuUsage = cpuCounter != null ? cpuCounter.NextValue() : 0f;
+                    lastCpuUpdate = now;
+                    LogToFile($"[XInput] CPU usage updated: {lastCpuUsage:F1}% at {DateTime.Now:HH:mm:ss.fff}");
+                }
 
                 if (DebugXInputOverlay)
                 {
                     overlayText.Add($"Polling: {(xInputTimer != null && xInputTimer.IsEnabled ? "Active" : "Stopped")}");
-                    overlayText.Add($"CPU: {cpuUsage:F1}%");
+                    overlayText.Add($"CPU: {lastCpuUsage:F1}%");
                     overlayText.Add($"FPS: {fps:F1}");
                     xInputOverlayText.Text = string.Join("\n", overlayText);
                 }
