@@ -10,8 +10,8 @@ using ArcadeLauncher.Core;
 using ArcadeLauncher.Plugins;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using System.Windows.Media.Animation;
 using System.Windows.Media;
 
 namespace ArcadeLauncher.SW3
@@ -25,9 +25,6 @@ namespace ArcadeLauncher.SW3
         private bool isOverlayVisible = false; // Default to off (hidden) when SW3 starts
         private const int DoublePressThreshold = 500;
         private IntPtr hookId = IntPtr.Zero;
-        private const float T1FadeOutDuration = 0.8f;
-        private const float T1FadeInDuration = 0.8f;
-        private const float T1OverlapPercentage = 0.98f;
         private DispatcherTimer? focusTimer; // Track focus timer to stop existing ones
         private DispatcherTimer? inputTimer; // Made nullable to fix CS8618
         private HookProc? hookProc; // Made nullable to fix CS8618
@@ -422,43 +419,7 @@ namespace ArcadeLauncher.SW3
                         Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
                         LogToFile($"SplashScreenWindow render forced for T3 at {DateTime.Now:HH:mm:ss.fff}.");
 
-                        splashScreenWindow.StartFadeAnimation();
-
-                        // Stop any existing focus timer
-                        if (focusTimer != null)
-                        {
-                            focusTimer.Stop();
-                            LogToFile($"Stopped existing T3 focus timer at {DateTime.Now:HH:mm:ss.fff}.");
-                            focusTimer = null;
-                        }
-
-                        focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
-                        int focusAttempts = 0;
-                        focusTimer.Tick += (s, e) =>
-                        {
-                            focusAttempts++;
-                            var currentForeground = GetForegroundWindow();
-                            if (currentForeground != splashHandle)
-                            {
-                                try
-                                {
-                                    SetForegroundWindow(splashHandle);
-                                    LogToFile($"T3 focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called for SplashScreenWindow, current foreground was {currentForeground}, target handle: {splashHandle}");
-                                }
-                                catch (Exception ex)
-                                {
-                                    LogToFile($"Error in T3 focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                                }
-                            }
-                            if (focusAttempts >= 20)
-                            {
-                                focusTimer.Stop();
-                                focusTimer = null;
-                                LogToFile($"T3 focus loop stopped at {DateTime.Now:HH:mm:ss.fff} after {focusAttempts} attempts.");
-                            }
-                        };
-                        focusTimer.Start();
-                        LogToFile($"T3 focus loop started for SplashScreenWindow at {DateTime.Now:HH:mm:ss.fff}.");
+                        PerformT3Fade(splashHandle);
                     }
                     else
                     {
@@ -868,185 +829,46 @@ namespace ArcadeLauncher.SW3
                     }
                 }, isLaunchPhase: true);
 
-                // T1 Fade-Out: MainWindow fades out with SineEase (EaseOut) over 0.8s
-                var fadeOutAnimation = new DoubleAnimation
+                // Perform T1 fade transition
+                PerformT1Fade(game, screenHeightPhysical);
+
+                // Launch game after fade-out (moved from T1 fade completion to ensure proper timing)
+                if (game.Type == "PC")
                 {
-                    From = 1.0,
-                    To = 0.0,
-                    Duration = TimeSpan.FromSeconds(T1FadeOutDuration),
-                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
-                };
-
-                // T1 Fade-In: SplashScreenWindow fades in with SineEase over 0.8s, starting at 98% of fade-out
-                var fadeInAnimation = new DoubleAnimation
+                    Process gameProcess = new Process();
+                    gameProcess.StartInfo.FileName = game.ExecutablePath;
+                    gameProcess.StartInfo.UseShellExecute = true;
+                    gameProcess.EnableRaisingEvents = true;
+                    isGameActive = true;
+                    gameProcess.Exited += (s2, e2) => Dispatcher.Invoke(() => PerformPostExitCleanup());
+                    gameProcess.Start();
+                    activeProcess = gameProcess;
+                    LogToFile($"Launched PC game at {DateTime.Now:HH:mm:ss.fff}: {game.ExecutablePath}");
+                }
+                else if (game.Type == "Emulated")
                 {
-                    From = 0.0,
-                    To = 1.0,
-                    Duration = TimeSpan.FromSeconds(T1FadeInDuration),
-                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn }
-                };
-
-                // Log opacity updates for fade-out
-                var fadeOutTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
-                fadeOutTimer.Tick += (s, e) =>
-                {
-                    LogToFile($"T1 MainWindow fade-out opacity update at {DateTime.Now:HH:mm:ss.fff}: Opacity={Opacity}, Visibility={Visibility}, IsLoaded={IsLoaded}");
-                };
-
-                // Start fade-out after a brief delay to ensure rendering
-                var startDelayTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(0.05) };
-                startDelayTimer.Tick += (s, e) =>
-                {
-                    startDelayTimer.Stop();
-                    LogToFile($"Starting T1 MainWindow fade-out (SineEase, EaseOut, {T1FadeOutDuration}s) at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}, IsLoaded: {IsLoaded}");
-                    try
+                    var plugin = plugins.FirstOrDefault(p => p.Name == game.EmulatorPlugin);
+                    if (plugin != null)
                     {
-                        fadeOutTimer.Start();
-                        this.BeginAnimation(OpacityProperty, fadeOutAnimation);
+                        plugin.PreLaunch(game.EmulatorPath, game.RomPath);
+                        var cmd = plugin.BuildLaunchCommand(game.EmulatorPath, game.RomPath, game.CustomParameters);
+                        Process emulatorProcess = new Process();
+                        emulatorProcess.StartInfo.FileName = "cmd.exe";
+                        emulatorProcess.StartInfo.Arguments = $"/c {cmd}";
+                        emulatorProcess.StartInfo.UseShellExecute = true;
+                        emulatorProcess.EnableRaisingEvents = true;
+                        isGameActive = true;
+                        emulatorProcess.Exited += (s2, e2) => Dispatcher.Invoke(() => PerformPostExitCleanup());
+                        emulatorProcess.Start();
+                        activeProcess = emulatorProcess;
+                        LogToFile($"Launched emulated game at {DateTime.Now:HH:mm:ss.fff}: {cmd}");
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        LogToFile($"Error starting T1 MainWindow fade-out at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
+                        LogToFile($"Emulator plugin not found for game type: {game.EmulatorPlugin} at {DateTime.Now:HH:mm:ss.fff}");
+                        throw new Exception($"Emulator plugin not found: {game.EmulatorPlugin}");
                     }
-                };
-                startDelayTimer.Start();
-
-                // Start fade-in at 98% of fade-out duration (0.8s * 0.98 = 0.784s)
-                var overlapTimer = new DispatcherTimer
-                {
-                    Interval = TimeSpan.FromSeconds(T1FadeOutDuration * T1OverlapPercentage)
-                };
-                overlapTimer.Tick += (s, e) =>
-                {
-                    overlapTimer.Stop();
-                    splashScreenWindow.Opacity = 0;
-                    splashScreenWindow.Visibility = Visibility.Visible;
-                    splashScreenWindow.Show();
-                    var splashHandle = new System.Windows.Interop.WindowInteropHelper(splashScreenWindow).Handle;
-                    try
-                    {
-                        SetForegroundWindow(splashHandle);
-                        splashScreenWindow.Activate();
-                        splashScreenWindow.Focus();
-                        LogToFile($"Starting T1 SplashScreenWindow fade-in (SineEase, {T1FadeInDuration}s) at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}, Overlap: {T1OverlapPercentage}");
-                        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
-                        LogToFile($"SplashScreenWindow render forced for T1 fade-in at {DateTime.Now:HH:mm:ss.fff}.");
-                        splashScreenWindow.BeginAnimation(OpacityProperty, fadeInAnimation);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogToFile($"Error starting T1 SplashScreenWindow fade-in at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                    }
-                };
-                overlapTimer.Start();
-
-                // Finalize fade-out
-                fadeOutAnimation.Completed += (s, e) =>
-                {
-                    fadeOutTimer.Stop();
-                    Visibility = Visibility.Hidden;
-                    LogToFile($"T1 MainWindow fade-out completed at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}, IsLoaded: {IsLoaded}");
-
-                    // Stop XInput polling after T1 fade-out
-                    if (xInputTimer != null)
-                    {
-                        xInputTimer.Stop();
-                        LogToFile($"XInput polling stopped at LaunchGame after T1 fade-out at {DateTime.Now:HH:mm:ss.fff}.");
-                    }
-
-                    // Update marquee and controller images after fade-out
-                    if (marqueeWindow != null && marqueeWindow.Content is Grid marqueeGrid)
-                    {
-                        string marqueePath = game.MarqueePath ?? System.IO.Path.Combine(Program.InstallDir, "default_marquee.png");
-                        FadeImage(marqueeGrid, new BitmapImage(new Uri(marqueePath, UriKind.Absolute)));
-                    }
-
-                    if (controllerWindow != null && controllerWindow.Content is Grid controllerGrid)
-                    {
-                        string? splashImagePath = null; // Fixed CS8600 by making nullable
-                        if (screenHeightPhysical >= 2160 && game.SplashScreenPath.ContainsKey("4k"))
-                        {
-                            splashImagePath = game.SplashScreenPath["4k"];
-                        }
-                        else if (screenHeightPhysical >= 1440 && game.SplashScreenPath.ContainsKey("1440p"))
-                        {
-                            splashImagePath = game.SplashScreenPath["1440p"];
-                        }
-                        else if (game.SplashScreenPath.ContainsKey("1080p"))
-                        {
-                            splashImagePath = game.SplashScreenPath["1080p"];
-                        }
-
-                        if (!string.IsNullOrEmpty(splashImagePath) && File.Exists(splashImagePath))
-                        {
-                            FadeImage(controllerGrid, new BitmapImage(new Uri(splashImagePath, UriKind.Absolute)));
-                        }
-                        else
-                        {
-                            string controllerDefaultPath = System.IO.Path.Combine(Program.InstallDir, "default_controller.png");
-                            FadeImage(controllerGrid, new BitmapImage(new Uri(controllerDefaultPath, UriKind.Absolute)));
-                        }
-                    }
-
-                    // Launch game after fade-out
-                    try
-                    {
-                        if (game.Type == "PC")
-                        {
-                            Process gameProcess = new Process();
-                            gameProcess.StartInfo.FileName = game.ExecutablePath;
-                            gameProcess.StartInfo.UseShellExecute = true;
-                            gameProcess.EnableRaisingEvents = true;
-                            isGameActive = true;
-                            gameProcess.Exited += (s2, e2) => Dispatcher.Invoke(() => PerformPostExitCleanup());
-                            gameProcess.Start();
-                            activeProcess = gameProcess;
-                            LogToFile($"Launched PC game at {DateTime.Now:HH:mm:ss.fff}: {game.ExecutablePath}");
-                        }
-                        else if (game.Type == "Emulated")
-                        {
-                            var plugin = plugins.FirstOrDefault(p => p.Name == game.EmulatorPlugin);
-                            if (plugin != null)
-                            {
-                                plugin.PreLaunch(game.EmulatorPath, game.RomPath);
-                                var cmd = plugin.BuildLaunchCommand(game.EmulatorPath, game.RomPath, game.CustomParameters);
-                                Process emulatorProcess = new Process();
-                                emulatorProcess.StartInfo.FileName = "cmd.exe";
-                                emulatorProcess.StartInfo.Arguments = $"/c {cmd}";
-                                emulatorProcess.StartInfo.UseShellExecute = true;
-                                emulatorProcess.EnableRaisingEvents = true;
-                                isGameActive = true;
-                                emulatorProcess.Exited += (s2, e2) => Dispatcher.Invoke(() => PerformPostExitCleanup());
-                                emulatorProcess.Start();
-                                activeProcess = emulatorProcess;
-                                LogToFile($"Launched emulated game at {DateTime.Now:HH:mm:ss.fff}: {cmd}");
-                            }
-                            else
-                            {
-                                LogToFile($"Emulator plugin not found for game type: {game.EmulatorPlugin} at {DateTime.Now:HH:mm:ss.fff}");
-                                throw new Exception($"Emulator plugin not found: {game.EmulatorPlugin}");
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogToFile($"Error launching game after T1 fade-out at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                    }
-                };
-
-                // Start progress timer after fade-in
-                fadeInAnimation.Completed += (s, e) =>
-                {
-                    LogToFile($"T1 SplashScreenWindow fade-in completed at {DateTime.Now:HH:mm:ss.fff}. Starting progress timer.");
-                    try
-                    {
-                        splashScreenWindow.StartProgressTimer();
-                    }
-                    catch (Exception ex)
-                    {
-                        LogToFile($"Error starting progress timer after T1 fade-in at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                    }
-                };
+                }
             }
             catch (Exception ex)
             {
