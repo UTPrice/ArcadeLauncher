@@ -397,7 +397,7 @@ namespace ArcadeLauncher.SW3
                             {
                                 LogToFile($"Error in onComplete callback at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
                             }
-                        }, isLaunchPhase: false, startFadeTimer: false);
+                        }, isLaunchPhase: false);
 
                         Visibility = Visibility.Hidden;
                         Opacity = 0;
@@ -866,7 +866,7 @@ namespace ArcadeLauncher.SW3
                         }
                         splashScreenWindow = null;
                     }
-                }, isLaunchPhase: true, startFadeTimer: false);
+                }, isLaunchPhase: true);
 
                 // T1 Fade-Out: MainWindow fades out with SineEase (EaseOut) over 0.8s
                 var fadeOutAnimation = new DoubleAnimation
