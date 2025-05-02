@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel; // For INotifyPropertyChanged
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -16,6 +15,8 @@ using System.Diagnostics;
 using ArcadeLauncher.Core;
 using ArcadeLauncher.Plugins;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
+using System.Collections.Generic;
 
 // Suppress CA1416 warnings for the entire assembly since this application is Windows-specific
 [assembly: System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1416:Validate platform compatibility", Justification = "This application is Windows-specific.")]
@@ -42,6 +43,10 @@ namespace ArcadeLauncher.SW3
         private Canvas canvas = null!; // Use a Canvas to prevent stretching
         private Border marginBorder = null!; // Border to apply left and right margins
         private int rows;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
 
         // INotifyPropertyChanged implementation
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -95,8 +100,7 @@ namespace ArcadeLauncher.SW3
             Activated += (s, e) => LogToFile("MainWindow activated.");
             Deactivated += (s, e) =>
             {
-                var activeWindow = GetForegroundWindow();
-                LogToFile($"MainWindow deactivated. Current foreground window handle: {activeWindow}");
+                LogToFile("MainWindow deactivated.");
             };
 
             Loaded += (s, e) =>
@@ -160,241 +164,13 @@ namespace ArcadeLauncher.SW3
                     LogToFile($"SelectedIndex {SelectedIndex} is out of range (games.Count: {games.Count})");
                 }
 
-                // Ensure the main window has focus
-                this.Activate();
-                this.Focus();
-                LogToFile("Main window activated and focused.");
+                RestoreFocusToMainWindow();
 
                 // Schedule diagnostic logging in a background thread to avoid blocking the UI thread
                 Task.Run(() => PerformDiagnosticLogging());
             };
-        }
 
-        private async Task PerformDiagnosticLogging()
-        {
-            try
-            {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    // Log the Window's size
-                    LogToFile($"Window Size - Width: {this.ActualWidth}, Height: {this.ActualHeight}");
-
-                    // Log the screen's logical dimensions for reference
-                    double screenLogicalWidth = SystemParameters.PrimaryScreenWidth;
-                    double screenLogicalHeight = SystemParameters.PrimaryScreenHeight;
-                    LogToFile($"Screen Logical Dimensions - Width: {screenLogicalWidth}, Height: {screenLogicalHeight}");
-
-                    // Log the physical dimensions (logical * DPI scaling)
-                    double screenPhysicalWidth = screenLogicalWidth * dpiScaleFactor;
-                    double screenPhysicalHeight = screenLogicalHeight * dpiScaleFactor;
-                    LogToFile($"Screen Physical Dimensions (Logical * DPI Scaling) - Width: {screenPhysicalWidth}, Height: {screenPhysicalHeight}");
-
-                    // Log the Canvas's position and size
-                    var canvasPosition = canvas.TransformToAncestor(this).Transform(new System.Windows.Point(0, 0));
-                    LogToFile($"Canvas Position - X: {canvasPosition.X}, Y: {canvasPosition.Y}, Width: {canvas.ActualWidth}, Height: {canvas.ActualHeight}");
-
-                    // Log the MarginBorder's computed position and size
-                    if (marginBorder != null)
-                    {
-                        var marginBorderPosition = marginBorder.TransformToAncestor(this).Transform(new System.Windows.Point(0, 0));
-                        LogToFile($"MarginBorder Position - X: {marginBorderPosition.X}, Y: {marginBorderPosition.Y}, Width: {marginBorder.ActualWidth}, Height: {marginBorder.ActualHeight}");
-                    }
-                    else
-                    {
-                        LogToFile("MarginBorder is null");
-                    }
-
-                    // Log the ScrollViewer's computed size and position
-                    var scrollViewerPosition = scrollViewer.TransformToAncestor(this).Transform(new System.Windows.Point(0, 0));
-                    LogToFile($"ScrollViewer Position (relative to Window) - X: {scrollViewerPosition.X}, Y: {scrollViewerPosition.Y} (logical pixels), Width: {scrollViewer.ActualWidth}, Height: {scrollViewer.ActualHeight} (logical pixels)");
-
-                    // Log the ItemsControl's padding
-                    if (gameItemsControl != null)
-                    {
-                        LogToFile($"ItemsControl Padding - Left: {gameItemsControl.Padding.Left}, Right: {gameItemsControl.Padding.Right}, Top: {gameItemsControl.Padding.Top}, Bottom: {gameItemsControl.Padding.Bottom}");
-                    }
-                    else
-                    {
-                        LogToFile("gameItemsControl is null");
-                    }
-
-                    // Log the positions of the first row's art boxes to verify gaps
-                    if (gameItemsControl != null && gameItemsControl.Items.Count >= settings.NumberOfColumns)
-                    {
-                        for (int i = 0; i < settings.NumberOfColumns; i++) // First row
-                        {
-                            var item = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
-                            if (item != null)
-                            {
-                                var transform = item.TransformToAncestor(this);
-                                var position = transform.Transform(new System.Windows.Point(0, 0));
-                                LogToFile($"First Row ArtBox {i} Position (relative to Window) - X: {position.X}, Y: {position.Y}, Width: {item.ActualWidth}, Height: {item.ActualHeight}");
-                                LogToFile($"First Row ArtBox {i} Margin - Left: {item.Margin.Left}, Right: {item.Margin.Right}, Top: {item.Margin.Top}, Bottom: {item.Margin.Bottom}");
-                                // Calculate horizontal gap to the next art box
-                                if (i < settings.NumberOfColumns - 1)
-                                {
-                                    var nextItem = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(i + 1) as FrameworkElement;
-                                    if (nextItem != null)
-                                    {
-                                        var nextTransform = nextItem.TransformToAncestor(this);
-                                        var nextPosition = nextTransform.Transform(new System.Windows.Point(0, 0));
-                                        double gap = nextPosition.X - (position.X + item.ActualWidth);
-                                        LogToFile($"Horizontal Gap between ArtBox {i} and ArtBox {i + 1}: {gap}");
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                LogToFile($"First Row ArtBox {i} is null");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        LogToFile($"ItemsControl has insufficient items for first row logging: Count={gameItemsControl?.Items.Count ?? 0}");
-                    }
-
-                    // Log the positions of the first and last art boxes to calculate effective margins
-                    if (gameItemsControl != null && gameItemsControl.Items.Count > 0)
-                    {
-                        var firstItem = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(0) as FrameworkElement;
-                        if (firstItem != null)
-                        {
-                            var transform = firstItem.TransformToAncestor(this);
-                            var position = transform.Transform(new System.Windows.Point(0, 0));
-                            LogToFile($"First ArtBox Position (relative to Window) - X: {position.X}, Y: {position.Y}, Width: {firstItem.ActualWidth}, Height: {firstItem.ActualHeight}");
-                            // Calculate effective left margin
-                            LogToFile($"Effective Left Margin (relative to Window): {position.X}");
-                        }
-
-                        // Find the rightmost art box in the first full row (not the last row, which may have fewer items)
-                        int rightmostIndex = settings.NumberOfColumns - 1; // Last item in the first row
-                        var rightmostItem = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(rightmostIndex) as FrameworkElement;
-                        if (rightmostItem != null)
-                        {
-                            var transform = rightmostItem.TransformToAncestor(this);
-                            var position = transform.Transform(new System.Windows.Point(0, 0));
-                            LogToFile($"Rightmost ArtBox in First Full Row (Index {rightmostIndex}) Position (relative to Window) - X: {position.X}, Y: {position.Y}, Width: {rightmostItem.ActualWidth}, Height: {rightmostItem.ActualHeight}");
-                            // Calculate effective right margin
-                            double rightEdge = position.X + rightmostItem.ActualWidth;
-                            double effectiveRightMargin = this.ActualWidth - rightEdge;
-                            LogToFile($"Effective Right Margin (relative to Window, based on first full row): {effectiveRightMargin}");
-                        }
-
-                        var lastItemIndex = gameItemsControl.Items.Count - 1;
-                        var lastItem = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(lastItemIndex) as FrameworkElement;
-                        if (lastItem != null)
-                        {
-                            var transform = lastItem.TransformToAncestor(this);
-                            var position = transform.Transform(new System.Windows.Point(0, 0));
-                            LogToFile($"Last ArtBox Position (relative to Window) - X: {position.X}, Y: {position.Y}, Width: {lastItem.ActualWidth}, Height: {lastItem.ActualHeight}");
-                        }
-                    }
-
-                    // Log the positions of ScrollViewer, ItemsPresenter, and UniformGrid
-                    scrollViewerPosition = scrollViewer.TransformToAncestor(this).Transform(new System.Windows.Point(0, 0));
-                    LogToFile($"ScrollViewer Position (relative to Window) - X: {scrollViewerPosition.X}, Y: {scrollViewerPosition.Y} (logical pixels), Width: {scrollViewer.ActualWidth}, Height: {scrollViewer.ActualHeight} (logical pixels)");
-
-                    ItemsPresenter? itemsPresenter = null;
-                    UniformGrid? uniformGrid = null;
-                    FrameworkElement? firstBorder = null;
-
-                    if (gameItemsControl != null)
-                    {
-                        itemsPresenter = FindVisualChild<ItemsPresenter>(gameItemsControl);
-                        if (itemsPresenter != null)
-                        {
-                            uniformGrid = FindVisualChild<UniformGrid>(itemsPresenter);
-                            if (uniformGrid != null)
-                            {
-                                LogToFile($"UniformGrid Details - Columns: {uniformGrid.Columns}, ActualWidth: {uniformGrid.ActualWidth}, ActualHeight: {uniformGrid.ActualHeight}");
-                                // Calculate and log the effective row height with null check
-                                double rowHeight = 0;
-                                if (uniformGrid.Rows > 0) // Ensure Rows is not zero to avoid division by zero
-                                {
-                                    rowHeight = (uniformGrid.ActualHeight - gameItemsControl.Margin.Top) / uniformGrid.Rows;
-                                }
-                                else
-                                {
-                                    LogToFile("UniformGrid Rows is zero, cannot calculate row height.");
-                                }
-                                LogToFile($"Calculated UniformGrid Row Height: {rowHeight}");
-                            }
-                            else
-                            {
-                                LogToFile("UniformGrid not found in ItemsPresenter");
-                            }
-                        }
-                        else
-                        {
-                            LogToFile("ItemsPresenter not found in ItemsControl");
-                        }
-                    }
-
-                    if (itemsPresenter != null)
-                    {
-                        var itemsPresenterPosition = itemsPresenter.TransformToAncestor(scrollViewer).Transform(new System.Windows.Point(0, 0));
-                        LogToFile($"ItemsPresenter Position (relative to ScrollViewer) - X: {itemsPresenterPosition.X}, Y: {itemsPresenterPosition.Y} (logical pixels), Width: {itemsPresenter.ActualWidth}, Height: {itemsPresenter.ActualHeight} (logical pixels)");
-                        if (uniformGrid != null)
-                        {
-                            var uniformGridPosition = uniformGrid.TransformToAncestor(itemsPresenter).Transform(new System.Windows.Point(0, 0));
-                            LogToFile($"UniformGrid Position (relative to ItemsPresenter) - X: {uniformGridPosition.X}, Y: {uniformGridPosition.Y} (logical pixels), Width: {uniformGrid.ActualWidth}, Height: {uniformGrid.ActualHeight} (logical pixels)");
-                            if (gameItemsControl.Items.Count > 0)
-                            {
-                                firstBorder = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(0) as FrameworkElement;
-                                if (firstBorder != null && uniformGrid != null)
-                                {
-                                    var borderPosition = firstBorder.TransformToAncestor(uniformGrid).Transform(new System.Windows.Point(0, 0));
-                                    LogToFile($"First Border Position (relative to UniformGrid) - X: {borderPosition.X}, Y: {borderPosition.Y} (logical pixels), Width: {firstBorder.ActualWidth}, Height: {firstBorder.ActualHeight} (logical pixels)");
-                                }
-                                else
-                                {
-                                    LogToFile("First Border or UniformGrid is null.");
-                                }
-                            }
-                            else
-                            {
-                                LogToFile("ItemsControl has no items.");
-                            }
-                        }
-                        else
-                        {
-                            LogToFile("UniformGrid is null.");
-                        }
-                    }
-                    else
-                    {
-                        LogToFile("ItemsPresenter is null.");
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                LogToFile($"Error in PerformDiagnosticLogging: {ex.Message}");
-            }
-        }
-
-        // Helper method to find a visual child of a specific type
-        private T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
-        {
-            if (parent == null) return null;
-
-            // The null check above ensures parent is not null in the loop
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent!); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent!, i);
-                if (child is T result)
-                {
-                    return result;
-                }
-
-                var descendant = FindVisualChild<T>(child);
-                if (descendant != null)
-                {
-                    return descendant;
-                }
-            }
-            return null;
+            Closing += Window_Closing;
         }
 
         private void SetupComponents()
@@ -714,10 +490,7 @@ namespace ArcadeLauncher.SW3
                     controllerWindow = null;
                 }
 
-                // Ensure the main window retains focus
-                this.Activate();
-                this.Focus();
-                LogToFile("Main window re-activated and focused after setting up secondary windows.");
+                RestoreFocusToMainWindow();
             }
             catch (Exception ex)
             {
@@ -740,6 +513,233 @@ namespace ArcadeLauncher.SW3
             LogToFile("Closed secondary windows on application shutdown.");
             // Shutdown XInput
             ShutdownXInput();
+        }
+
+        private async Task PerformDiagnosticLogging()
+        {
+            try
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    // Log the Window's size
+                    LogToFile($"Window Size - Width: {this.ActualWidth}, Height: {this.ActualHeight}");
+
+                    // Log the screen's logical dimensions for reference
+                    double screenLogicalWidth = SystemParameters.PrimaryScreenWidth;
+                    double screenLogicalHeight = SystemParameters.PrimaryScreenHeight;
+                    LogToFile($"Screen Logical Dimensions - Width: {screenLogicalWidth}, Height: {screenLogicalHeight}");
+
+                    // Log the physical dimensions (logical * DPI scaling)
+                    double screenPhysicalWidth = screenLogicalWidth * dpiScaleFactor;
+                    double screenPhysicalHeight = screenLogicalHeight * dpiScaleFactor;
+                    LogToFile($"Screen Physical Dimensions (Logical * DPI Scaling) - Width: {screenPhysicalWidth}, Height: {screenPhysicalHeight}");
+
+                    // Log the Canvas's position and size
+                    var canvasPosition = canvas.TransformToAncestor(this).Transform(new System.Windows.Point(0, 0));
+                    LogToFile($"Canvas Position - X: {canvasPosition.X}, Y: {canvasPosition.Y}, Width: {canvas.ActualWidth}, Height: {canvas.ActualHeight}");
+
+                    // Log the MarginBorder's computed position and size
+                    if (marginBorder != null)
+                    {
+                        var marginBorderPosition = marginBorder.TransformToAncestor(this).Transform(new System.Windows.Point(0, 0));
+                        LogToFile($"MarginBorder Position - X: {marginBorderPosition.X}, Y: {marginBorderPosition.Y}, Width: {marginBorder.ActualWidth}, Height: {marginBorder.ActualHeight}");
+                    }
+                    else
+                    {
+                        LogToFile("MarginBorder is null");
+                    }
+
+                    // Log the ScrollViewer's computed size and position
+                    var scrollViewerPosition = scrollViewer.TransformToAncestor(this).Transform(new System.Windows.Point(0, 0));
+                    LogToFile($"ScrollViewer Position (relative to Window) - X: {scrollViewerPosition.X}, Y: {scrollViewerPosition.Y} (logical pixels), Width: {scrollViewer.ActualWidth}, Height: {scrollViewer.ActualHeight} (logical pixels)");
+
+                    // Log the ItemsControl's padding
+                    if (gameItemsControl != null)
+                    {
+                        LogToFile($"ItemsControl Padding - Left: {gameItemsControl.Padding.Left}, Right: {gameItemsControl.Padding.Right}, Top: {gameItemsControl.Padding.Top}, Bottom: {gameItemsControl.Padding.Bottom}");
+                    }
+                    else
+                    {
+                        LogToFile("gameItemsControl is null");
+                    }
+
+                    // Log the positions of the first row's art boxes to verify gaps
+                    if (gameItemsControl != null && gameItemsControl.Items.Count >= settings.NumberOfColumns)
+                    {
+                        for (int i = 0; i < settings.NumberOfColumns; i++) // First row
+                        {
+                            var item = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+                            if (item != null)
+                            {
+                                var transform = item.TransformToAncestor(this);
+                                var position = transform.Transform(new System.Windows.Point(0, 0));
+                                LogToFile($"First Row ArtBox {i} Position (relative to Window) - X: {position.X}, Y: {position.Y}, Width: {item.ActualWidth}, Height: {item.ActualHeight}");
+                                LogToFile($"First Row ArtBox {i} Margin - Left: {item.Margin.Left}, Right: {item.Margin.Right}, Top: {item.Margin.Top}, Bottom: {item.Margin.Bottom}");
+                                // Calculate horizontal gap to the next art box
+                                if (i < settings.NumberOfColumns - 1)
+                                {
+                                    var nextItem = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(i + 1) as FrameworkElement;
+                                    if (nextItem != null)
+                                    {
+                                        var nextTransform = nextItem.TransformToAncestor(this);
+                                        var nextPosition = nextTransform.Transform(new System.Windows.Point(0, 0));
+                                        double gap = nextPosition.X - (position.X + item.ActualWidth);
+                                        LogToFile($"Horizontal Gap between ArtBox {i} and ArtBox {i + 1}: {gap}");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                LogToFile($"First Row ArtBox {i} is null");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        LogToFile($"ItemsControl has insufficient items for first row logging: Count={gameItemsControl?.Items.Count ?? 0}");
+                    }
+
+                    // Log the positions of the first and last art boxes to calculate effective margins
+                    if (gameItemsControl != null && gameItemsControl.Items.Count > 0)
+                    {
+                        var firstItem = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(0) as FrameworkElement;
+                        if (firstItem != null)
+                        {
+                            var transform = firstItem.TransformToAncestor(this);
+                            var position = transform.Transform(new System.Windows.Point(0, 0));
+                            LogToFile($"First ArtBox Position (relative to Window) - X: {position.X}, Y: {position.Y}, Width: {firstItem.ActualWidth}, Height: {firstItem.ActualHeight}");
+                            // Calculate effective left margin
+                            LogToFile($"Effective Left Margin (relative to Window): {position.X}");
+                        }
+
+                        // Find the rightmost art box in the first full row (not the last row, which may have fewer items)
+                        int rightmostIndex = settings.NumberOfColumns - 1; // Last item in the first row
+                        var rightmostItem = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(rightmostIndex) as FrameworkElement;
+                        if (rightmostItem != null)
+                        {
+                            var transform = rightmostItem.TransformToAncestor(this);
+                            var position = transform.Transform(new System.Windows.Point(0, 0));
+                            LogToFile($"Rightmost ArtBox in First Full Row (Index {rightmostIndex}) Position (relative to Window) - X: {position.X}, Y: {position.Y}, Width: {rightmostItem.ActualWidth}, Height: {rightmostItem.ActualHeight}");
+                            // Calculate effective right margin
+                            double rightEdge = position.X + rightmostItem.ActualWidth;
+                            double effectiveRightMargin = this.ActualWidth - rightEdge;
+                            LogToFile($"Effective Right Margin (relative to Window, based on first full row): {effectiveRightMargin}");
+                        }
+
+                        var lastItemIndex = gameItemsControl.Items.Count - 1;
+                        var lastItem = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(lastItemIndex) as FrameworkElement;
+                        if (lastItem != null)
+                        {
+                            var transform = lastItem.TransformToAncestor(this);
+                            var position = transform.Transform(new System.Windows.Point(0, 0));
+                            LogToFile($"Last ArtBox Position (relative to Window) - X: {position.X}, Y: {position.Y}, Width: {lastItem.ActualWidth}, Height: {lastItem.ActualHeight}");
+                        }
+                    }
+
+                    // Log the positions of ScrollViewer, ItemsPresenter, and UniformGrid
+                    scrollViewerPosition = scrollViewer.TransformToAncestor(this).Transform(new System.Windows.Point(0, 0));
+                    LogToFile($"ScrollViewer Position (relative to Window) - X: {scrollViewerPosition.X}, Y: {scrollViewerPosition.Y} (logical pixels), Width: {scrollViewer.ActualWidth}, Height: {scrollViewer.ActualHeight} (logical pixels)");
+
+                    ItemsPresenter? itemsPresenter = null;
+                    UniformGrid? uniformGrid = null;
+                    FrameworkElement? firstBorder = null;
+
+                    if (gameItemsControl != null)
+                    {
+                        itemsPresenter = FindVisualChild<ItemsPresenter>(gameItemsControl);
+                        if (itemsPresenter != null)
+                        {
+                            uniformGrid = FindVisualChild<UniformGrid>(itemsPresenter);
+                            if (uniformGrid != null)
+                            {
+                                LogToFile($"UniformGrid Details - Columns: {uniformGrid.Columns}, ActualWidth: {uniformGrid.ActualWidth}, ActualHeight: {uniformGrid.ActualHeight}");
+                                // Calculate and log the effective row height with null check
+                                double rowHeight = 0;
+                                if (uniformGrid.Rows > 0) // Ensure Rows is not zero to avoid division by zero
+                                {
+                                    rowHeight = (uniformGrid.ActualHeight - gameItemsControl.Margin.Top) / uniformGrid.Rows;
+                                }
+                                else
+                                {
+                                    LogToFile("UniformGrid Rows is zero, cannot calculate row height.");
+                                }
+                                LogToFile($"Calculated UniformGrid Row Height: {rowHeight}");
+                            }
+                            else
+                            {
+                                LogToFile("UniformGrid not found in ItemsPresenter");
+                            }
+                        }
+                        else
+                        {
+                            LogToFile("ItemsPresenter not found in ItemsControl");
+                        }
+                    }
+
+                    if (itemsPresenter != null)
+                    {
+                        var itemsPresenterPosition = itemsPresenter.TransformToAncestor(scrollViewer).Transform(new System.Windows.Point(0, 0));
+                        LogToFile($"ItemsPresenter Position (relative to ScrollViewer) - X: {itemsPresenterPosition.X}, Y: {itemsPresenterPosition.Y} (logical pixels), Width: {itemsPresenter.ActualWidth}, Height: {itemsPresenter.ActualHeight} (logical pixels)");
+                        if (uniformGrid != null)
+                        {
+                            var uniformGridPosition = uniformGrid.TransformToAncestor(itemsPresenter).Transform(new System.Windows.Point(0, 0));
+                            LogToFile($"UniformGrid Position (relative to ItemsPresenter) - X: {uniformGridPosition.X}, Y: {uniformGridPosition.Y} (logical pixels), Width: {uniformGrid.ActualWidth}, Height: {uniformGrid.ActualHeight} (logical pixels)");
+                            if (gameItemsControl.Items.Count > 0)
+                            {
+                                firstBorder = gameItemsControl.ItemContainerGenerator.ContainerFromIndex(0) as FrameworkElement;
+                                if (firstBorder != null && uniformGrid != null)
+                                {
+                                    var borderPosition = firstBorder.TransformToAncestor(uniformGrid).Transform(new System.Windows.Point(0, 0));
+                                    LogToFile($"First Border Position (relative to UniformGrid) - X: {borderPosition.X}, Y: {borderPosition.Y} (logical pixels), Width: {firstBorder.ActualWidth}, Height: {firstBorder.ActualHeight} (logical pixels)");
+                                }
+                                else
+                                {
+                                    LogToFile("First Border or UniformGrid is null.");
+                                }
+                            }
+                            else
+                            {
+                                LogToFile("ItemsControl has no items.");
+                            }
+                        }
+                        else
+                        {
+                            LogToFile("UniformGrid is null.");
+                        }
+                    }
+                    else
+                    {
+                        LogToFile("ItemsPresenter is null.");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                LogToFile($"Error in PerformDiagnosticLogging: {ex.Message}");
+            }
+        }
+
+        // Helper method to find a visual child of a specific type
+        private T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null) return null;
+
+            // The null check above ensures parent is not null in the loop
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent!); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent!, i);
+                if (child is T result)
+                {
+                    return result;
+                }
+
+                var descendant = FindVisualChild<T>(child);
+                if (descendant != null)
+                {
+                    return descendant;
+                }
+            }
+            return null;
         }
     }
 }

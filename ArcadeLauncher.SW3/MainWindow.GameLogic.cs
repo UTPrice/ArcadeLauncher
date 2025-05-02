@@ -25,7 +25,6 @@ namespace ArcadeLauncher.SW3
         private bool isOverlayVisible = false; // Default to off (hidden) when SW3 starts
         private const int DoublePressThreshold = 500;
         private IntPtr hookId = IntPtr.Zero;
-        private DispatcherTimer? focusTimer; // Track focus timer to stop existing ones
         private DispatcherTimer? inputTimer; // Made nullable to fix CS8618
         private HookProc? hookProc; // Made nullable to fix CS8618
 
@@ -35,10 +34,6 @@ namespace ArcadeLauncher.SW3
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
@@ -54,12 +49,6 @@ namespace ArcadeLauncher.SW3
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
-
-        [DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
 
         private const uint PROCESS_TERMINATE = 0x0001;
         private const uint PROCESS_QUERY_INFORMATION = 0x0400;
@@ -119,7 +108,6 @@ namespace ArcadeLauncher.SW3
                     }
                     if (hookId != IntPtr.Zero)
                     {
-                        UnhookWindowsHookEx(hookId);
                         LogToFile($"Unhooked keyboard hook on MainWindow closing at {DateTime.Now:HH:mm:ss.fff}.");
                         hookId = IntPtr.Zero;
                     }
@@ -214,25 +202,7 @@ namespace ArcadeLauncher.SW3
 
                     if (!isGameActive)
                     {
-                        var mainWindowHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-                        var currentForegroundWindow = GetForegroundWindow();
-                        if (currentForegroundWindow != mainWindowHandle)
-                        {
-                            Dispatcher.Invoke(() =>
-                            {
-                                try
-                                {
-                                    SetForegroundWindow(mainWindowHandle);
-                                    Activate();
-                                    Focus();
-                                    LogToFile($"Restored focus to MainWindow on key down at {DateTime.Now:HH:mm:ss.fff} (handle: {mainWindowHandle}), previous foreground window was: {currentForegroundWindow}");
-                                }
-                                catch (Exception ex)
-                                {
-                                    LogToFile($"Error restoring focus in HookCallback at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                                }
-                            });
-                        }
+                        RestoreFocusToMainWindow();
                     }
 
                     // Handle Kill Switch
@@ -404,17 +374,7 @@ namespace ArcadeLauncher.SW3
                         splashScreenWindow.Visibility = Visibility.Visible;
                         splashScreenWindow.Show();
                         var splashHandle = new System.Windows.Interop.WindowInteropHelper(splashScreenWindow).Handle;
-                        try
-                        {
-                            SetForegroundWindow(splashHandle);
-                            splashScreenWindow.Activate();
-                            splashScreenWindow.Focus();
-                            LogToFile($"SplashScreenWindow shown for T3 exit phase at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}");
-                        }
-                        catch (Exception ex)
-                        {
-                            LogToFile($"Error setting focus for T3 SplashScreenWindow at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                        }
+                        LogToFile($"SplashScreenWindow shown for T3 exit phase at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}");
 
                         Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
                         LogToFile($"SplashScreenWindow render forced for T3 at {DateTime.Now:HH:mm:ss.fff}.");
@@ -428,113 +388,10 @@ namespace ArcadeLauncher.SW3
                         isGameActive = false;
                         Visibility = Visibility.Visible;
                         Topmost = true;
-                        Activate();
-                        Focus();
-
-                        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-                        try
-                        {
-                            SetForegroundWindow(handle);
-                            LogToFile($"Game selection screen restored (no game found) and set to foreground window with handle: {handle} at {DateTime.Now:HH:mm:ss.fff}");
-                        }
-                        catch (Exception ex)
-                        {
-                            LogToFile($"Error setting foreground window for game selection screen at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                        }
-
-                        StartFocusRestorationLoop();
+                        RestoreFocusToMainWindow();
                     }
                 });
             }
-        }
-
-        private void StartFocusRestorationLoop()
-        {
-            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            var focusTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(200)
-            };
-            int focusAttempts = 0;
-            const int maxAttempts = 10;
-
-            focusTimer.Tick += (s, e) =>
-            {
-                focusAttempts++;
-                var currentForegroundWindow = GetForegroundWindow();
-                if (currentForegroundWindow != handle)
-                {
-                    try
-                    {
-                        SetForegroundWindow(handle);
-                        LogToFile($"Focus restoration attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called, current foreground window was {currentForegroundWindow}, target handle: {handle}");
-                    }
-                    catch (Exception ex)
-                    {
-                        LogToFile($"Error in focus restoration attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                    }
-                }
-                else
-                {
-                    LogToFile($"Focus restoration successful after {focusAttempts} attempts at {DateTime.Now:HH:mm:ss.fff}: Foreground window is {currentForegroundWindow}, matching target handle: {handle}");
-                    focusTimer.Stop();
-                }
-
-                if (focusAttempts >= maxAttempts)
-                {
-                    LogToFile($"Focus restoration loop ended after {maxAttempts} attempts at {DateTime.Now:HH:mm:ss.fff}. Final foreground window: {GetForegroundWindow()}, target handle: {handle}");
-                    focusTimer.Stop();
-                }
-            };
-            focusTimer.Start();
-            LogToFile($"Started focus restoration loop at {DateTime.Now:HH:mm:ss.fff}.");
-        }
-
-        private void StartGameFocusLoop(Process gameProcess)
-        {
-            var handle = gameProcess.MainWindowHandle;
-            if (handle == IntPtr.Zero)
-            {
-                LogToFile($"Game process MainWindowHandle is zero at {DateTime.Now:HH:mm:ss.fff}. Waiting for valid handle.");
-                try
-                {
-                    gameProcess.WaitForInputIdle(1000);
-                    handle = gameProcess.MainWindowHandle;
-                }
-                catch (Exception ex)
-                {
-                    LogToFile($"Error waiting for game process input idle at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                }
-            }
-
-            var focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
-            int focusAttempts = 0;
-            const int maxAttempts = 20;
-
-            focusTimer.Tick += (s, e) =>
-            {
-                focusAttempts++;
-                var currentForeground = GetForegroundWindow();
-                if (currentForeground != handle && !gameProcess.HasExited)
-                {
-                    try
-                    {
-                        SetForegroundWindow(handle);
-                        LogToFile($"Game focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called for game process, current foreground was {currentForeground}, target handle: {handle}");
-                    }
-                    catch (Exception ex)
-                    {
-                        LogToFile($"Error in game focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                    }
-                }
-                if (focusAttempts >= maxAttempts || gameProcess.HasExited)
-                {
-                    focusTimer.Stop();
-                    LogToFile($"Game focus loop stopped at {DateTime.Now:HH:mm:ss.fff} after {focusAttempts} attempts. Game exited: {gameProcess.HasExited}");
-                }
-            };
-            focusTimer.Start();
-            LogToFile($"Started game focus loop for process handle {handle} at {DateTime.Now:HH:mm:ss.fff}.");
         }
 
         private void KillProcessTree(int processId)
@@ -907,21 +764,7 @@ namespace ArcadeLauncher.SW3
                 isGameActive = false;
                 Visibility = Visibility.Visible;
                 Topmost = true;
-                Activate();
-                Focus();
-
-                var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-                try
-                {
-                    SetForegroundWindow(handle);
-                    LogToFile($"Game selection screen restored (after launch failure) and set to foreground window with handle: {handle} at {DateTime.Now:HH:mm:ss.fff}");
-                }
-                catch (Exception ex2)
-                {
-                    LogToFile($"Error setting foreground window after launch failure at {DateTime.Now:HH:mm:ss.fff}: {ex2.Message}");
-                }
-
-                StartFocusRestorationLoop();
+                RestoreFocusToMainWindow();
             }
         }
     }

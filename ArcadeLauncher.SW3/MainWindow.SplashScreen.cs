@@ -100,15 +100,7 @@ namespace ArcadeLauncher.SW3
                     // Attempt to restore MainWindow if not in launch phase
                     if (!isLaunchPhase && parentWindow != null && parentWindow.IsLoaded)
                     {
-                        parentWindow.Dispatcher.Invoke(() =>
-                        {
-                            parentWindow.Visibility = Visibility.Visible;
-                            parentWindow.Opacity = 1;
-                            parentWindow.Topmost = true;
-                            parentWindow.Activate();
-                            parentWindow.Focus();
-                            parentWindow.LogToFile($"MainWindow restored on SplashScreenWindow closing at {DateTime.Now:HH:mm:ss.fff}. Visibility: {parentWindow.Visibility}, Opacity: {parentWindow.Opacity}, IsLoaded: {parentWindow.IsLoaded}");
-                        });
+                        parentWindow.RestoreFocusToMainWindow();
                     }
                 };
             }
@@ -136,15 +128,7 @@ namespace ArcadeLauncher.SW3
                         parentWindow.LogToFile($"T4 fallback timer triggered at {DateTime.Now:HH:mm:ss.fff}. ProgressValue={progressValue}%. Restoring MainWindow.");
                         if (parentWindow != null && parentWindow.IsLoaded)
                         {
-                            parentWindow.Dispatcher.Invoke(() =>
-                            {
-                                parentWindow.Visibility = Visibility.Visible;
-                                parentWindow.Opacity = 1;
-                                parentWindow.Topmost = true;
-                                parentWindow.Activate();
-                                parentWindow.Focus();
-                                parentWindow.LogToFile($"MainWindow restored via T4 fallback at {DateTime.Now:HH:mm:ss.fff}. Visibility: {parentWindow.Visibility}, Opacity: {parentWindow.Opacity}, IsLoaded: {parentWindow.IsLoaded}");
-                            });
+                            parentWindow.RestoreFocusToMainWindow();
                         }
                         Close();
                     };

@@ -78,20 +78,10 @@ namespace ArcadeLauncher.SW3
                 splashScreenWindow.Visibility = Visibility.Visible;
                 splashScreenWindow.Show();
                 var splashHandle = new System.Windows.Interop.WindowInteropHelper(splashScreenWindow).Handle;
-                try
-                {
-                    SetForegroundWindow(splashHandle);
-                    splashScreenWindow.Activate();
-                    splashScreenWindow.Focus();
-                    LogToFile($"Starting T1 SplashScreenWindow fade-in (SineEase, {T1FadeInDuration}s) at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}, Overlap: {T1OverlapPercentage}");
-                    Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
-                    LogToFile($"SplashScreenWindow render forced for T1 fade-in at {DateTime.Now:HH:mm:ss.fff}.");
-                    splashScreenWindow.BeginAnimation(OpacityProperty, fadeInAnimation);
-                }
-                catch (Exception ex)
-                {
-                    LogToFile($"Error starting T1 SplashScreenWindow fade-in at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                }
+                LogToFile($"Starting T1 SplashScreenWindow fade-in (SineEase, {T1FadeInDuration}s) at {DateTime.Now:HH:mm:ss.fff}. Visibility: {splashScreenWindow.Visibility}, Opacity: {splashScreenWindow.Opacity}, Handle: {splashHandle}, Overlap: {T1OverlapPercentage}");
+                Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+                LogToFile($"SplashScreenWindow render forced for T1 fade-in at {DateTime.Now:HH:mm:ss.fff}.");
+                splashScreenWindow.BeginAnimation(OpacityProperty, fadeInAnimation);
             };
             overlapTimer.Start();
 
@@ -237,41 +227,7 @@ namespace ArcadeLauncher.SW3
                 LogToFile($"Error starting T3 fade-in animation at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
             }
 
-            // Stop any existing focus timer
-            if (focusTimer != null)
-            {
-                focusTimer.Stop();
-                LogToFile($"Stopped existing T3 focus timer at {DateTime.Now:HH:mm:ss.fff}.");
-                focusTimer = null;
-            }
-
-            focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
-            int focusAttempts = 0;
-            focusTimer.Tick += (s, e) =>
-            {
-                focusAttempts++;
-                var currentForeground = GetForegroundWindow();
-                if (currentForeground != splashHandle)
-                {
-                    try
-                    {
-                        SetForegroundWindow(splashHandle);
-                        LogToFile($"T3 focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: SetForegroundWindow called for SplashScreenWindow, current foreground was {currentForeground}, target handle: {splashHandle}");
-                    }
-                    catch (Exception ex)
-                    {
-                        LogToFile($"Error in T3 focus attempt {focusAttempts} at {DateTime.Now:HH:mm:ss.fff}: {ex.Message}");
-                    }
-                }
-                if (focusAttempts >= 20)
-                {
-                    focusTimer.Stop();
-                    focusTimer = null;
-                    LogToFile($"T3 focus loop stopped at {DateTime.Now:HH:mm:ss.fff} after {focusAttempts} attempts.");
-                }
-            };
-            focusTimer.Start();
-            LogToFile($"T3 focus loop started for SplashScreenWindow at {DateTime.Now:HH:mm:ss.fff}.");
+            RestoreFocusToSplashScreen(splashHandle);
         }
 
         private void PerformT4Fade(SplashScreenWindow splashScreen)
@@ -356,8 +312,6 @@ namespace ArcadeLauncher.SW3
                     try
                     {
                         Topmost = true;
-                        Activate();
-                        Focus();
                         LogToFile($"Starting T4 MainWindow fade-in (SineEase, {T4FadeInDuration}s) at {DateTime.Now:HH:mm:ss.fff}. Visibility: {Visibility}, Opacity: {Opacity}, Overlap: {T4OverlapPercentage}, IsLoaded: {IsLoaded}");
                         Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
                         LogToFile($"MainWindow render forced for T4 fade-in at {DateTime.Now:HH:mm:ss.fff}.");
@@ -388,9 +342,7 @@ namespace ArcadeLauncher.SW3
                     try
                     {
                         Topmost = true;
-                        Activate();
-                        Focus();
-                        LogToFile($"MainWindow made visible and focused after T4 at {DateTime.Now:HH:mm:ss.fff}.");
+                        RestoreFocusToMainWindow();
                         // Resume XInput polling after T4
                         if (xInputTimer != null)
                         {
