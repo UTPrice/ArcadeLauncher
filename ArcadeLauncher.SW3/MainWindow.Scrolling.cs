@@ -86,6 +86,12 @@ namespace ArcadeLauncher.SW3
                         newTargetOffset = viewportBottom - containerHeight;
                         LogToFile($"Downward to row {currentRow} - Step 3 Variables: ViewportBottom={viewportBottom} (logical pixels), ContainerHeight={containerHeight} (logical pixels)");
                         LogToFile($"Downward to row {currentRow} - Step 3 Calculation: targetOffset = ViewportBottom - ContainerHeight = {viewportBottom} - {containerHeight} = {newTargetOffset} (logical pixels)");
+
+                        // Additional adjustment: Lower the viewport by 2 * borderThickness (in logical pixels, DPI-independent)
+                        double additionalOffset = 2.5 * borderThickness;
+                        newTargetOffset += additionalOffset;
+                        LogToFile($"Downward to row {currentRow} - Step 4 Adjustment: Adding 2 * BorderThickness = 2 * {borderThickness} = {additionalOffset} (logical pixels)");
+                        LogToFile($"Downward to row {currentRow} - Step 4 Final: newTargetOffset = {newTargetOffset} (logical pixels)");
                     }
                     else
                     {
@@ -93,6 +99,12 @@ namespace ArcadeLauncher.SW3
                         LogToFile($"Downward to row {currentRow} - Fallback Variables: RowBottom={rowBottom} (logical pixels), TopMargin={topMargin} (logical pixels), ContainerHeight={containerHeight} (logical pixels)");
                         newTargetOffset = rowBottom + topMargin - containerHeight;
                         LogToFile($"Downward to row {currentRow} - Fallback Calculation: targetOffset = RowBottom + TopMargin - ContainerHeight = {rowBottom} + {topMargin} - {containerHeight} = {newTargetOffset} (logical pixels)");
+
+                        // Additional adjustment: Lower the viewport by 2 * borderThickness (in logical pixels, DPI-independent)
+                        double additionalOffset = 2 * borderThickness;
+                        newTargetOffset += additionalOffset;
+                        LogToFile($"Downward to row {currentRow} - Fallback Adjustment: Adding 2 * BorderThickness = 2 * {borderThickness} = {additionalOffset} (logical pixels)");
+                        LogToFile($"Downward to row {currentRow} - Fallback Final: newTargetOffset = {newTargetOffset} (logical pixels)");
                     }
                 }
             }
@@ -185,8 +197,8 @@ namespace ArcadeLauncher.SW3
 
             // Apply ease-in-out function: t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2)^2 / 2
             double easedProgress = progress < 0.5
-                ? 2 * progress * progress
-                : 1 - Math.Pow(-2 * progress + 2, 2) / 2;
+            ? 2 * progress * progress
+            : 1 - Math.Pow(-2 * progress + 2, 2) / 2;
 
             // Interpolate the offset
             double newOffset = startOffset + (targetOffset - startOffset) * easedProgress;
